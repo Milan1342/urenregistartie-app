@@ -1,22 +1,24 @@
 import streamlit as st
+import gspread
 import pandas as pd
-import os
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 st.set_page_config(page_title="Urenregistratie", layout="centered")
-
 st.title("Urenregistratie & Inkomsten Tracker")
 
-CSV_FILE = "uren.csv"
+# Google Sheets configuratie
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+CREDS = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", SCOPE)
+client = gspread.authorize(CREDS)
 
-# Controleer of het CSV-bestand bestaat en niet leeg is
-if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
-    try:
-        df = pd.read_csv(CSV_FILE, parse_dates=["Datum"])
-    except Exception:
-        df = pd.DataFrame(columns=["Datum", "Activiteit", "Uren", "Inkomsten"])
-else:
-    df = pd.DataFrame(columns=["Datum", "Activiteit", "Uren", "Inkomsten"])
+# Sheet openen
+SHEET_NAME = "urenregistratie"
+sheet = client.open(SHEET_NAME).sheet1
+
+# Data inlezen uit sheet
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
 
 # Uurtarief invoer
 tarief = st.number_input("Uurtarief (€ per uur)", value=25.0, step=1.0)
@@ -33,14 +35,9 @@ activiteit = st.text_input("Activiteit", placeholder="Bijv. Website bouwen")
 
 if st.button("Toevoegen"):
     if activiteit:
-        nieuwe_gegevens = {
-            "Datum": pd.to_datetime(datum),
-            "Activiteit": activiteit,
-            "Uren": uren,
-            "Inkomsten": round(uren * tarief, 2)
-        }
-        df = pd.concat([df, pd.DataFrame([nieuwe_gegevens])], ignore_index=True)
-        df.to_csv(CSV_FILE, index=False)
+        inkomsten = round(uren * tarief, 2)
+        nieuwe_gegevens = [datum.strftime("%Y-%m-%d"), activiteit, uren, inkomsten]
+        sheet.append_row(nieuwe_gegevens)
         st.success("Invoer toegevoegd!")
         st.experimental_rerun()
     else:
@@ -49,6 +46,7 @@ if st.button("Toevoegen"):
 # Overzicht tonen
 st.subheader("Overzicht")
 if not df.empty:
+    df["Datum"] = pd.to_datetime(df["Datum"])
     df_sorted = df.sort_values("Datum", ascending=False)
     st.dataframe(df_sorted, use_container_width=True)
 
