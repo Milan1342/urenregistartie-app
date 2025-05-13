@@ -4,8 +4,10 @@ from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+
 # Scopes voor Google Sheets toegang
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
 
 # Authenticatie via Streamlit secrets
 CREDS = ServiceAccountCredentials.from_json_keyfile_dict(
