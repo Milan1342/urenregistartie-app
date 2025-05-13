@@ -6,7 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 # Scopes voor Google Sheets toegang
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+SCOPE = ["https://spreadsheets.google.com/feeds"]
 
 
 # Authenticatie via Streamlit secrets
