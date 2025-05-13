@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os 
 from datetime import datetime
 
 st.set_page_config(page_title="Urenregistratie", layout="centered")
@@ -11,7 +12,8 @@ CSV_FILE = "uren.csv"
 
 # Probeer eerder ingevoerde data te laden
 try:
-    df = pd.read_csv(CSV_FILE, parse_dates=["Datum"])
+    if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
+        df = pd.read_csv(CSV_FILE, parse_dates=["Datum"])
 except FileNotFoundError:
     df = pd.DataFrame(columns=["Datum", "Activiteit", "Uren", "Inkomsten"])
 
