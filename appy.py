@@ -26,27 +26,41 @@ st.title("Urenregistratie & Inkomsten Tracker")
 # Formulier voor invoer
 with st.form("uren_formulier"):
     datum = st.date_input("Datum", value=datetime.today())
-    uren = st.number_input("Aantal uren", min_value=0.0, step=0.25)
-    tarief = st.number_input("Uurloon (€)", min_value=0.0, step=1.0)
+    uren = st.number_input("Uren", min_value=0.0, step=0.25)
+    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=1.0)
     submitted = st.form_submit_button("Toevoegen")
 
     if submitted:
-        salaris = uren * tarief
-        nieuwe_rij = [str(datum), uren, tarief, salaris]
+        salaris = uren * uurloon
+        nieuwe_rij = [str(datum), uren, uurloon, salaris]
         SHEET.append_row(nieuwe_rij)
-        st.success("Uren succesvol toegevoegd!")
+        st.success("✅ Uren succesvol toegevoegd!")
 
-# Data ophalen met opgegeven headers
-headers = ["Datum", "Uren", "Uurloon", "Salaris"]
-data = SHEET.get_all_records(expected_headers=headers)
-df = pd.DataFrame(data)
+# Toon bestaande data
+try:
+    data = SHEET.get_all_records(expected_headers=["Datum", "Uren", "Uurloon", "Salaris"])
+    df = pd.DataFrame(data)
+except Exception as e:
+    st.warning("⚠️ Fout bij het ophalen van de gegevens. Controleer of de headers kloppen in de sheet.")
+    st.stop()
 
 if not df.empty:
-    st.subheader("Overzicht")
+    st.subheader("📊 Overzicht")
     st.dataframe(df)
 
-    totaal_uren = df["Uren"].sum()
-    totaal_salaris = df["Salaris"].sum()
+    # Zorg dat de kolommen numeriek zijn
+    df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
+    df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
 
-    st.metric("Totale uren", f"{totaal_uren:.2f} uur")
-    st.metric("Totaal salaris", f"€ {totaal_salaris:.2f}")
+    # Bereken totalen
+    totaal_uren = df["Uren"].sum(skipna=True)
+    totaal_salaris = df["Salaris"].sum(skipna=True)
+
+    # Toon totalen
+    try:
+        st.metric("Totale uren", f"{totaal_uren:.2f} uur")
+        st.metric("Totaal salaris", f"€ {totaal_salaris:.2f}")
+    except Exception as e:
+        st.warning("⚠️ Kan geen totalen tonen — controleer of alle data correct is ingevuld.")
+else:
+    st.info("📂 Geen gegevens beschikbaar in de spreadsheet.")
