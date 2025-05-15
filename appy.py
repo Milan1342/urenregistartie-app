@@ -8,6 +8,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 # Scopes voor Google Sheets toegang
 SCOPE = ["https://spreadsheets.google.com/feeds"]
 
+import streamlit as st
+st.write(st.secrets)  # tijdelijk alleen tijdens debuggen
 
 # Authenticatie via Streamlit secrets
 CREDS = ServiceAccountCredentials.from_json_keyfile_dict(
