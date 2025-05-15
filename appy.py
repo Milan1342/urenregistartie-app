@@ -22,31 +22,42 @@ except Exception:
 
 st.title("Urenregistratie & Inkomsten Tracker")
 
-# Invoervelden
 with st.form("uren_formulier"):
     datum = st.date_input("Datum", value=datetime.today())
     starttijd = st.time_input("Starttijd")
     eindtijd = st.time_input("Eindtijd")
-    pauze = st.number_input("Pauze (in minuten)", min_value=0, step=5)
-    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=0.50, format="%.2f")
+    pauze_min = st.number_input("Pauze (in minuten)", min_value=0, step=5)
+
+    uurloon_input = st.text_input("Uurloon (€)", placeholder="Bijv. 12,50")
+
     submitted = st.form_submit_button("Toevoegen")
 
     if submitted:
-        start = datetime.combine(datum, starttijd)
-        einde = datetime.combine(datum, eindtijd)
+        # Verwerk uurloon met ondersteuning voor komma
+        try:
+            uurloon = float(uurloon_input.replace(",", "."))
+        except ValueError:
+            st.error("❌ Ongeldige invoer voor uurloon. Gebruik alleen cijfers, bijv. 12,50.")
+            st.stop()
 
-        if einde <= start:
-            st.error("❌ Eindtijd moet na starttijd liggen.")
+        start_dt = datetime.combine(datum, starttijd)
+        eind_dt = datetime.combine(datum, eindtijd)
+
+        if eind_dt <= start_dt:
+            st.error("❌ Eindtijd moet later zijn dan starttijd.")
         else:
-            totaal_tijd = einde - start - timedelta(minutes=pauze)
-            gewerkte_uren = round(totaal_tijd.total_seconds() / 3600, 2)
-            salaris = round(gewerkte_uren * uurloon, 2)
+            totale_tijd = (eind_dt - start_dt).total_seconds() / 3600  # in uren
+            pauze_uren = pauze_min / 60
+            gewerkte_uren = max(totale_tijd - pauze_uren, 0)
 
-            # Netto berekening voor student onder 20k (ca. 2% loonheffing)
-            netto_salaris = round(salaris * 0.98, 2)
+            salaris = gewerkte_uren * uurloon
 
-            nieuwe_rij = [str(datum), gewerkte_uren, uurloon, salaris, netto_salaris]
+            # Netto salaris voor studenten met inkomen < 20.000 → ~96% belastingvrij
+            netto_salaris = salaris * 0.96
+
+            nieuwe_rij = [str(datum), round(gewerkte_uren, 2), uurloon, round(salaris, 2), round(netto_salaris, 2)]
             SHEET.append_row(nieuwe_rij)
+
             st.success("✅ Uren succesvol toegevoegd!")
 
 # Data ophalen
