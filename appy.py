@@ -1,89 +1,62 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import re
+from datetime import datetime
 
-# Scopes voor Google Sheets toegang
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+st.set_page_config(page_title="Urenregistratie", layout="wide")
+st.title("Urenregistratie Periode")
 
-# Authenticatie via Streamlit secrets
-CREDS = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp_service_account"], SCOPE
-)
-client = gspread.authorize(CREDS)
+st.markdown("""
+Voer je uren in onder elkaar, bijvoorbeeld:
 
-# Open de spreadsheet
-try:
-    SHEET = client.open("urenregistratie").sheet1
-except Exception:
-    st.error("❌ Kan spreadsheet niet openen. Controleer of de naam klopt en of het service-account toegang heeft tot het document.")
-    st.stop()
+```
+Ma- 14 apr 12.30/20.30(30) 7.5uur
+Di- 29 apr 12.00/20.30(60) 7.5 uur
+```
+""")
 
-st.title("Urenregistratie & Inkomsten Tracker")
+input_text = st.text_area("Plak hier je uren:", height=300)
 
-with st.form("uren_formulier"):
-    datum = st.date_input("Datum", value=datetime.today())
-    starttijd = st.time_input("Starttijd")
-    eindtijd = st.time_input("Eindtijd")
-    pauze_min = st.number_input("Pauze (in minuten)", min_value=0, step=5)
-    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=0.1, format="%.2f")
+data = []
 
-    submitted = st.form_submit_button("Toevoegen")
+# Regex patroon voor invoer als: Ma- 14 apr 12.30/20.30(30) 7.5uur
+pattern = r"(?P<dag>\w{2})-\s*(?P<datum>\d{1,2}\s\w{3})\s+(?P<start>\d{1,2}[.:]\d{2})/(?P<eind>\d{1,2}[.:]\d{2})\((?P<pauze>\d+)\)\s+(?P<uren>[\d.,]+)\s*uur"
 
-    if submitted:
-        start_dt = datetime.combine(datum, starttijd)
-        eind_dt = datetime.combine(datum, eindtijd)
+def parse_row(row):
+    match = re.match(pattern, row.strip(), re.IGNORECASE)
+    if match:
+        items = match.groupdict()
+        # Converteer tijden
+        start_time = items['start'].replace('.', ':')
+        end_time = items['eind'].replace('.', ':')
+        datum_str = f"{items['datum']} 2025"
+        try:
+            datum_obj = datetime.strptime(datum_str, "%d %b %Y")
+        except ValueError:
+            return None
 
-        if eind_dt <= start_dt:
-            st.error("❌ Eindtijd moet later zijn dan starttijd.")
-        else:
-            totale_tijd = (eind_dt - start_dt).total_seconds() / 3600  # in uren
-            pauze_uren = pauze_min / 60
-            gewerkte_uren = max(totale_tijd - pauze_uren, 0)
+        return {
+            "Dag": items['dag'],
+            "Datum": datum_obj.strftime("%Y-%m-%d"),
+            "Starttijd": start_time,
+            "Eindtijd": end_time,
+            "Pauze (min)": int(items['pauze']),
+            "Uren": float(items['uren'].replace(',', '.'))
+        }
+    return None
 
-            salaris = gewerkte_uren * uurloon
-            netto_salaris = salaris * 0.96  # 96% netto voor studenten < €20.000
+if input_text:
+    rows = input_text.strip().split('\n')
+    for row in rows:
+        parsed = parse_row(row)
+        if parsed:
+            data.append(parsed)
 
-            nieuwe_rij = [
-                str(datum),
-                round(gewerkte_uren, 2),
-                f"{uurloon:.2f}".replace(".", ","),
-                f"{salaris:.2f}".replace(".", ","),
-                f"{netto_salaris:.2f}".replace(".", ",")
-            ]
-            SHEET.append_row(nieuwe_rij)
-            st.success("✅ Uren succesvol toegevoegd!")
+    if data:
+        df = pd.DataFrame(data)
+        st.dataframe(df, use_container_width=True)
 
-# Gegevens ophalen en tonen
-verwachte_kolommen = ["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"]
-try:
-    data = SHEET.get_all_records(expected_headers=verwachte_kolommen)
-    df = pd.DataFrame(data)
-except Exception:
-    st.error(f"❌ De volgende kolommen ontbreken in het blad: {', '.join(verwachte_kolommen)}")
-    st.stop()
-
-if not df.empty:
-    st.subheader("📊 Overzicht")
-    
-    # Kolommen converteren van string met komma naar float
-    df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
-    df["Uurloon"] = pd.to_numeric(df["Uurloon"].astype(str).str.replace(",", "."), errors="coerce")
-    df["Salaris"] = pd.to_numeric(df["Salaris"].astype(str).str.replace(",", "."), errors="coerce")
-    df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"].astype(str).str.replace(",", "."), errors="coerce")
-
-    st.dataframe(df)
-
-    try:
-        totaal_uren = df["Uren"].sum()
-        totaal_bruto = df["Salaris"].sum()
-        totaal_netto = df["Netto Salaris"].sum()
-
-        st.metric("Totale uren", f"{totaal_uren:.2f} uur")
-        st.metric("Totaal salaris", f"€ {totaal_bruto:.2f}")
-        st.metric("Netto salaris", f"€ {totaal_netto:.2f}")
-    except Exception:
-        st.warning("⚠️ Kon totalen niet berekenen — controleer de datatypes.")
-else:
-    st.info("📂 Geen gegevens beschikbaar in de spreadsheet.")
+        totaal_uren = df['Uren'].sum()
+        st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
+    else:
+        st.warning("Geen geldige regels gevonden. Zorg dat het formaat klopt zoals aangegeven.")
