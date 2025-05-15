@@ -49,14 +49,14 @@ with st.form("uren_formulier"):
 
 # Toon bestaande data
 try:
-    data = SHEET.get_all_records(expected_headers=["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"])
+    data = SHEET.get_all_records(expected_headers=["Datum", "Urengewerkt", "Uurloon", "Salaris", "Netto Salaris"])
     df = pd.DataFrame(data)
 except Exception as e:
     st.warning("⚠️ Fout bij het ophalen van de gegevens. Controleer of de headers kloppen in de sheet.")
     st.stop()
 
 # Controleer of alle vereiste kolommen aanwezig zijn
-verwachte_kolommen = ["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"]
+verwachte_kolommen = ["Datum", "Urengewerkt", "Uurloon", "Salaris", "Netto Salaris"]
 ontbrekend = [kol for kol in verwachte_kolommen if kol not in df.columns]
 if ontbrekend:
     st.error(f"❌ De volgende kolommen ontbreken in de sheet: {', '.join(ontbrekend)}")
@@ -67,12 +67,12 @@ if not df.empty:
     st.dataframe(df)
 
     # Zorg dat de kolommen numeriek zijn
-    df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
+    df["Urengewerkt"] = pd.to_numeric(df["Urengewerkt"], errors="coerce")
     df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
     df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
 
     # Bereken totalen
-    totaal_uren = df["Uren"].sum(skipna=True)
+    totaal_uren = df["Urengewerkt"].sum(skipna=True)
     totaal_salaris = df["Salaris"].sum(skipna=True)
     totaal_netto = df["Netto Salaris"].sum(skipna=True)
 
