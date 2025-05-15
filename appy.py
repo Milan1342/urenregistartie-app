@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -13,73 +13,68 @@ CREDS = ServiceAccountCredentials.from_json_keyfile_dict(
 )
 client = gspread.authorize(CREDS)
 
-# Open de spreadsheet en de juiste sheet
+# Open de spreadsheet
 try:
     SHEET = client.open("urenregistratie").sheet1
-except Exception as e:
+except Exception:
     st.error("❌ Kan spreadsheet niet openen. Controleer of de naam klopt en of het service-account toegang heeft tot het document.")
     st.stop()
 
-# Titel
 st.title("Urenregistratie & Inkomsten Tracker")
 
-# Formulier voor invoer
+# Invoervelden
 with st.form("uren_formulier"):
     datum = st.date_input("Datum", value=datetime.today())
-    uren_input = st.text_input("Uren gewerkt", placeholder="Bijv. 5,5 of 5.5")
-    uurloon_input = st.text_input("Uurloon (€)", placeholder="Bijv. 12,50 of 12.50")
+    starttijd = st.time_input("Starttijd")
+    eindtijd = st.time_input("Eindtijd")
+    pauze = st.number_input("Pauze (in minuten)", min_value=0, step=5)
+    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=0.50, format="%.2f")
     submitted = st.form_submit_button("Toevoegen")
 
     if submitted:
-        try:
-            # Vervang komma's door punten voor correcte conversie
-            uren = float(uren_input.replace(",", "."))
-            uurloon = float(uurloon_input.replace(",", "."))
+        start = datetime.combine(datum, starttijd)
+        einde = datetime.combine(datum, eindtijd)
 
-            salaris = uren * uurloon
-            # Voor studenten < €20.000/jaar is belastingdruk ~7% incl. arbeidskorting
-            belastingdruk = 0.07
-            netto_salaris = round(salaris * (1 - belastingdruk), 2)
+        if einde <= start:
+            st.error("❌ Eindtijd moet na starttijd liggen.")
+        else:
+            totaal_tijd = einde - start - timedelta(minutes=pauze)
+            gewerkte_uren = round(totaal_tijd.total_seconds() / 3600, 2)
+            salaris = round(gewerkte_uren * uurloon, 2)
 
-            nieuwe_rij = [str(datum), uren, uurloon, round(salaris, 2), netto_salaris]
+            # Netto berekening voor student onder 20k (ca. 2% loonheffing)
+            netto_salaris = round(salaris * 0.98, 2)
+
+            nieuwe_rij = [str(datum), gewerkte_uren, uurloon, salaris, netto_salaris]
             SHEET.append_row(nieuwe_rij)
             st.success("✅ Uren succesvol toegevoegd!")
-        except ValueError:
-            st.error("❌ Ongeldige invoer. Gebruik alleen cijfers (bijv. 12,5 of 12.5).")
 
-# Toon bestaande data
+# Data ophalen
+verwachte_kolommen = ["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"]
 try:
-    data = SHEET.get_all_records(expected_headers=["Datum", "Urengewerkt", "Uurloon", "Salaris", "Netto Salaris"])
+    data = SHEET.get_all_records(expected_headers=verwachte_kolommen)
     df = pd.DataFrame(data)
-except Exception as e:
-    st.warning("⚠️ Fout bij het ophalen van de gegevens. Controleer of de headers kloppen in de sheet.")
-    st.stop()
-
-# Controleer of alle vereiste kolommen aanwezig zijn
-verwachte_kolommen = ["Datum", "Urengewerkt", "Uurloon", "Salaris", "Netto Salaris"]
-ontbrekend = [kol for kol in verwachte_kolommen if kol not in df.columns]
-if ontbrekend:
-    st.error(f"❌ De volgende kolommen ontbreken in de sheet: {', '.join(ontbrekend)}")
+except Exception:
+    st.error(f"❌ De volgende kolommen ontbreken in het blad: {', '.join(verwachte_kolommen)}")
     st.stop()
 
 if not df.empty:
     st.subheader("📊 Overzicht")
     st.dataframe(df)
 
-    # Zorg dat de kolommen numeriek zijn
-    df["Urengewerkt"] = pd.to_numeric(df["Urengewerkt"], errors="coerce")
-    df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
-    df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
+    try:
+        df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
+        df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
+        df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
 
-    # Bereken totalen
-    totaal_uren = df["Urengewerkt"].sum(skipna=True)
-    totaal_salaris = df["Salaris"].sum(skipna=True)
-    totaal_netto = df["Netto Salaris"].sum(skipna=True)
+        totaal_uren = df["Uren"].sum()
+        totaal_bruto = df["Salaris"].sum()
+        totaal_netto = df["Netto Salaris"].sum()
 
-    # Toon totalen
-    st.metric("Totale uren", f"{totaal_uren:.2f} uur")
-    st.metric("Bruto totaal", f"€ {totaal_salaris:.2f}")
-    st.metric("Netto totaal", f"€ {totaal_netto:.2f}")
+        st.metric("Totale uren", f"{totaal_uren:.2f} uur")
+        st.metric("Totaal salaris", f"€ {totaal_bruto:.2f}")
+        st.metric("Netto salaris", f"€ {totaal_netto:.2f}")
+    except Exception:
+        st.warning("⚠️ Kon totalen niet berekenen — controleer de datatypes.")
 else:
     st.info("📂 Geen gegevens beschikbaar in de spreadsheet.")
-
