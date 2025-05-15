@@ -4,12 +4,8 @@ from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-
 # Scopes voor Google Sheets toegang
-SCOPE = ["https://spreadsheets.google.com/feeds"]
-
-import streamlit as st
-st.write(st.secrets)  # tijdelijk alleen tijdens debuggen
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 # Authenticatie via Streamlit secrets
 CREDS = ServiceAccountCredentials.from_json_keyfile_dict(
@@ -46,10 +42,12 @@ if not df.empty:
     st.subheader("Overzicht")
     st.dataframe(df)
 
-    # Totale uren en inkomsten
-    totaal_uren = df["Aantal uren"].sum()
-    totaal_inkomsten = df["Totaal"].sum()
+    # Zorg dat de kolomnamen correct zijn
+    if "Aantal uren" in df.columns and "Totaal" in df.columns:
+        totaal_uren = df["Aantal uren"].sum()
+        totaal_inkomsten = df["Totaal"].sum()
 
-    st.metric("Totale uren", f"{totaal_uren:.2f} uur")
-    st.metric("Totale inkomsten", f"€ {totaal_inkomsten:.2f}")
-
+        st.metric("Totale uren", f"{totaal_uren:.2f} uur")
+        st.metric("Totale inkomsten", f"€ {totaal_inkomsten:.2f}")
+    else:
+        st.warning("Controleer of de kolommen 'Aantal uren' en 'Totaal' correct gespeld zijn in je Google Sheet.")
