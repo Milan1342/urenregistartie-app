@@ -16,67 +16,70 @@ client = gspread.authorize(CREDS)
 # Open de spreadsheet en de juiste sheet
 try:
     SHEET = client.open("urenregistratie").sheet1
-except Exception:
+except Exception as e:
     st.error("❌ Kan spreadsheet niet openen. Controleer of de naam klopt en of het service-account toegang heeft tot het document.")
     st.stop()
 
 # Titel
 st.title("Urenregistratie & Inkomsten Tracker")
 
+# Formulier voor invoer
+with st.form("uren_formulier"):
+    datum = st.date_input("Datum", value=datetime.today())
+    uren_input = st.text_input("Uren gewerkt", placeholder="Bijv. 5,5 of 5.5")
+    uurloon_input = st.text_input("Uurloon (€)", placeholder="Bijv. 12,50 of 12.50")
+    submitted = st.form_submit_button("Toevoegen")
+
+    if submitted:
+        try:
+            # Vervang komma's door punten voor correcte conversie
+            uren = float(uren_input.replace(",", "."))
+            uurloon = float(uurloon_input.replace(",", "."))
+
+            salaris = uren * uurloon
+            # Voor studenten < €20.000/jaar is belastingdruk ~7% incl. arbeidskorting
+            belastingdruk = 0.07
+            netto_salaris = round(salaris * (1 - belastingdruk), 2)
+
+            nieuwe_rij = [str(datum), uren, uurloon, round(salaris, 2), netto_salaris]
+            SHEET.append_row(nieuwe_rij)
+            st.success("✅ Uren succesvol toegevoegd!")
+        except ValueError:
+            st.error("❌ Ongeldige invoer. Gebruik alleen cijfers (bijv. 12,5 of 12.5).")
+
 # Toon bestaande data
 try:
     data = SHEET.get_all_records(expected_headers=["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"])
     df = pd.DataFrame(data)
-except Exception:
+except Exception as e:
     st.warning("⚠️ Fout bij het ophalen van de gegevens. Controleer of de headers kloppen in de sheet.")
     st.stop()
 
-# Zorg dat kolommen numeriek zijn
-df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
-df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
-df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
+# Controleer of alle vereiste kolommen aanwezig zijn
+verwachte_kolommen = ["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"]
+ontbrekend = [kol for kol in verwachte_kolommen if kol not in df.columns]
+if ontbrekend:
+    st.error(f"❌ De volgende kolommen ontbreken in de sheet: {', '.join(ontbrekend)}")
+    st.stop()
 
-# Bereken totaal jaarinkomen tot nu toe
-jaar_inkomen = df["Salaris"].sum(skipna=True)
-
-# Formulier voor invoer
-with st.form("uren_formulier"):
-    datum = st.date_input("Datum", value=datetime.today())
-    uren = st.number_input("Uren", min_value=0.0, step=0.25)
-    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=1.0, format="%.2f")
-    submitted = st.form_submit_button("Toevoegen")
-
-    if submitted:
-        salaris = uren * uurloon
-
-        # Update jaarinkomen inclusief deze invoer
-        nieuw_totaal = jaar_inkomen + salaris
-
-        # Bepaal netto percentage op basis van drempel
-        if nieuw_totaal <= 20000:
-            netto_salaris = salaris * 0.93
-        else:
-            netto_salaris = salaris * 0.70
-
-        nieuwe_rij = [str(datum), uren, uurloon, salaris, netto_salaris]
-        SHEET.append_row(nieuwe_rij)
-        st.success("✅ Uren succesvol toegevoegd!")
-
-        # Herbereken voor weergave
-        df.loc[len(df)] = [str(datum), uren, uurloon, salaris, netto_salaris]
-        jaar_inkomen = nieuw_totaal
-
-# Toon overzicht
 if not df.empty:
     st.subheader("📊 Overzicht")
     st.dataframe(df)
 
+    # Zorg dat de kolommen numeriek zijn
+    df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
+    df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
+    df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
+
+    # Bereken totalen
     totaal_uren = df["Uren"].sum(skipna=True)
-    totaal_bruto = df["Salaris"].sum(skipna=True)
+    totaal_salaris = df["Salaris"].sum(skipna=True)
     totaal_netto = df["Netto Salaris"].sum(skipna=True)
 
+    # Toon totalen
     st.metric("Totale uren", f"{totaal_uren:.2f} uur")
-    st.metric("Totaal bruto salaris", f"€ {totaal_bruto:.2f}")
-    st.metric("Totaal netto salaris", f"€ {totaal_netto:.2f}")
+    st.metric("Bruto totaal", f"€ {totaal_salaris:.2f}")
+    st.metric("Netto totaal", f"€ {totaal_netto:.2f}")
 else:
     st.info("📂 Geen gegevens beschikbaar in de spreadsheet.")
+
