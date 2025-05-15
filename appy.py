@@ -27,19 +27,11 @@ with st.form("uren_formulier"):
     starttijd = st.time_input("Starttijd")
     eindtijd = st.time_input("Eindtijd")
     pauze_min = st.number_input("Pauze (in minuten)", min_value=0, step=5)
-
-    uurloon_input = st.text_input("Uurloon (€)", placeholder="Bijv. 12,50")
+    uurloon = st.number_input("Uurloon (€)", min_value=0.0, step=0.1, format="%.2f")
 
     submitted = st.form_submit_button("Toevoegen")
 
     if submitted:
-        # Verwerk uurloon met ondersteuning voor komma
-        try:
-            uurloon = float(uurloon_input.replace(",", "."))
-        except ValueError:
-            st.error("❌ Ongeldige invoer voor uurloon. Gebruik alleen cijfers, bijv. 12,50.")
-            st.stop()
-
         start_dt = datetime.combine(datum, starttijd)
         eind_dt = datetime.combine(datum, eindtijd)
 
@@ -51,16 +43,19 @@ with st.form("uren_formulier"):
             gewerkte_uren = max(totale_tijd - pauze_uren, 0)
 
             salaris = gewerkte_uren * uurloon
+            netto_salaris = salaris * 0.96  # 96% netto voor studenten < €20.000
 
-            # Netto salaris voor studenten met inkomen < 20.000 → ~96% belastingvrij
-            netto_salaris = salaris * 0.96
-
-            nieuwe_rij = [str(datum), round(gewerkte_uren, 2), uurloon, round(salaris, 2), round(netto_salaris, 2)]
+            nieuwe_rij = [
+                str(datum),
+                round(gewerkte_uren, 2),
+                f"{uurloon:.2f}".replace(".", ","),
+                f"{salaris:.2f}".replace(".", ","),
+                f"{netto_salaris:.2f}".replace(".", ",")
+            ]
             SHEET.append_row(nieuwe_rij)
-
             st.success("✅ Uren succesvol toegevoegd!")
 
-# Data ophalen
+# Gegevens ophalen en tonen
 verwachte_kolommen = ["Datum", "Uren", "Uurloon", "Salaris", "Netto Salaris"]
 try:
     data = SHEET.get_all_records(expected_headers=verwachte_kolommen)
@@ -71,13 +66,16 @@ except Exception:
 
 if not df.empty:
     st.subheader("📊 Overzicht")
+    
+    # Kolommen converteren van string met komma naar float
+    df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
+    df["Uurloon"] = pd.to_numeric(df["Uurloon"].astype(str).str.replace(",", "."), errors="coerce")
+    df["Salaris"] = pd.to_numeric(df["Salaris"].astype(str).str.replace(",", "."), errors="coerce")
+    df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"].astype(str).str.replace(",", "."), errors="coerce")
+
     st.dataframe(df)
 
     try:
-        df["Uren"] = pd.to_numeric(df["Uren"], errors="coerce")
-        df["Salaris"] = pd.to_numeric(df["Salaris"], errors="coerce")
-        df["Netto Salaris"] = pd.to_numeric(df["Netto Salaris"], errors="coerce")
-
         totaal_uren = df["Uren"].sum()
         totaal_bruto = df["Salaris"].sum()
         totaal_netto = df["Netto Salaris"].sum()
