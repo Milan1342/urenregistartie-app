@@ -282,7 +282,7 @@ elif pagina == "Overzicht":
             if cols[-1].button("🗑️", key=f"del_{i}"):
                 st.session_state["uren_data"].pop(i)
                 save_uren()
-                st.experimental_rerun()
+                st.rerun()
 
         # Bewerken van een regel
         if "edit_row" in st.session_state:
@@ -311,10 +311,10 @@ elif pagina == "Overzicht":
                 }
                 save_uren()
                 del st.session_state["edit_row"]
-                st.experimental_rerun()
+                st.rerun()
             if annuleren:
                 del st.session_state["edit_row"]
-                st.experimental_rerun()
+                st.rerun()
 
         # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
         st.subheader("Periode selectie (4 weken per periode)")
@@ -324,7 +324,7 @@ elif pagina == "Overzicht":
                 st.session_state["eerste_periode_start"] = eerste_start
                 save_eerste_periode(eerste_start)
                 st.success("Eerste periode ingesteld!")
-                st.experimental_rerun()
+                st.rerun()
             st.stop()
         else:
             eerste_start = st.session_state["eerste_periode_start"]
@@ -335,7 +335,7 @@ elif pagina == "Overzicht":
                     st.session_state["eerste_periode_start"] = nieuwe_start
                     save_eerste_periode(nieuwe_start)
                     st.success("Eerste periode aangepast!")
-                    st.experimental_rerun()
+                    st.rerun()
                 st.stop()
             # Bepaal het aantal periodes tot nu toe
             dagen_geleden = (date.today() - eerste_start).days
