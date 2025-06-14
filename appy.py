@@ -3,6 +3,27 @@ import pandas as pd
 import re
 from datetime import datetime, date, time
 from io import BytesIO
+import os
+
+UREN_CSV = "uren_data.csv"
+BEDRIJVEN_CSV = "bedrijven.csv"
+
+def load_data():
+    if os.path.exists(UREN_CSV):
+        st.session_state["uren_data"] = pd.read_csv(UREN_CSV).to_dict("records")
+    if os.path.exists(BEDRIJVEN_CSV):
+        st.session_state["bedrijven"] = pd.read_csv(BEDRIJVEN_CSV).to_dict("records")
+
+def save_uren():
+    pd.DataFrame(st.session_state["uren_data"]).to_csv(UREN_CSV, index=False)
+
+def save_bedrijven():
+    pd.DataFrame(st.session_state["bedrijven"]).to_csv(BEDRIJVEN_CSV, index=False)
+
+# Laad data bij start
+if "data_loaded" not in st.session_state:
+    load_data()
+    st.session_state["data_loaded"] = True
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
@@ -90,6 +111,7 @@ if pagina == "Bedrijven beheren":
                 "uurtarief": uurtarief,
                 "loonheffing": loonheffing
             })
+            save_bedrijven()
             st.success(f"Bedrijf '{naam}' toegevoegd.")
 
     if st.session_state["bedrijven"]:
@@ -139,6 +161,7 @@ elif pagina == "Uren invoeren":
                         "Pauze (min)": pauze,
                         "Uren": uren
                     })
+                    save_uren()
 
         elif invoermethode == "Plakken uit notities":
             bedrijf = st.selectbox("Bedrijf", bedrijven_namen, key="bedrijf_plak")
@@ -165,6 +188,7 @@ elif pagina == "Uren invoeren":
                         fouten.append(f"Regel {i} niet herkend: {row}")
                 if fouten:
                     st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
+                save_uren()
 
 # ------------------ Overzicht ------------------
 elif pagina == "Overzicht":
