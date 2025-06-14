@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from io import BytesIO
 import os
 
@@ -149,6 +149,7 @@ if pagina == "Persoonsgegevens":
     else:
         schatting = 0.36
     st.session_state["persoon"]["loonheffingspercentage"] = schatting
+    st.info(f"Geschat loonheffingspercentage: {schatting*100:.1f}%")
 
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
@@ -228,17 +229,11 @@ elif pagina == "Uren invoeren":
             Plak hieronder je notities, bijvoorbeeld:
 
             ```
-            Ma- 14 apr 12.30/20.30(30) 7.5 uur
+            Ma- 14 apr 12.30/20.30(30) 7.5uur
             Di- 15 apr 12.00/20.30(60) 7.5 uur
-            Wo- 16 apr 12.00/20.30(60) 7.5 uur
+            ...
+            Totaal: 15 uur, €180 netto
             ```
-            let op de juiste opmaak:
-            - Dag (2 letters)
-            - Datum (dag, maand)
-            - Starttijd en eindtijd (hh:mm)
-            - Pauze in minuten tussen haakjes
-            - Uren (decimaal, met punt of komma)
-            - kijk goed naar de spaties en opmaak van het voorbeeld!
             """)
             input_text = st.text_area("Plak hier je uren:", height=200)
             fouten = []
@@ -279,21 +274,76 @@ elif pagina == "Overzicht":
         df['Datum_obj'] = pd.to_datetime(df['Datum'])
         df['Week'] = df['Datum_obj'].dt.isocalendar().week
 
-        # Filter op bedrijf
-        bedrijven_namen = [b["naam"] for b in bedrijven]
-        bedrijf_filter = st.selectbox("Filter op bedrijf", ["Alle bedrijven"] + bedrijven_namen)
-        if bedrijf_filter != "Alle bedrijven":
-            df = df[df["Bedrijf"] == bedrijf_filter]
+        # Toevoegen: Uren aanpassen/verwijderen
+        st.subheader("Uren aanpassen of verwijderen")
+        for i, row in df.iterrows():
+            cols = st.columns([2,2,2,2,2,2,2,1,1])
+            for j, col in enumerate(["Bedrijf","Dag","Datum","Starttijd","Eindtijd","Pauze (min)","Uren"]):
+                cols[j].write(str(row[col]))
+            if cols[-2].button("✏️", key=f"edit_{i}"):
+                st.session_state["edit_row"] = i
+            if cols[-1].button("🗑️", key=f"del_{i}"):
+                st.session_state["uren_data"].pop(i)
+                save_uren()
+                st.experimental_rerun()
 
-        # Gebruik centrale periode
-        st.subheader("Periode")
-        start_datum = st.session_state["periode_start"]
-        eind_datum = st.session_state["periode_eind"]
-        st.info(f"Periode: {start_datum} t/m {eind_datum}")
+        # Bewerken van een regel
+        if "edit_row" in st.session_state:
+            idx = st.session_state["edit_row"]
+            edit_row = st.session_state["uren_data"][idx]
+            st.info("Pas de gegevens aan en klik op 'Opslaan'")
+            with st.form("edit_form"):
+                bedrijf = st.text_input("Bedrijf", value=edit_row["Bedrijf"])
+                dag = st.text_input("Dag", value=edit_row["Dag"])
+                datum = st.date_input("Datum", value=pd.to_datetime(edit_row["Datum"]).date())
+                starttijd = st.text_input("Starttijd", value=edit_row["Starttijd"])
+                eindtijd = st.text_input("Eindtijd", value=edit_row["Eindtijd"])
+                pauze = st.number_input("Pauze (min)", value=int(edit_row["Pauze (min)"]))
+                uren = st.number_input("Uren", value=float(edit_row["Uren"]))
+                opslaan = st.form_submit_button("Opslaan")
+                annuleren = st.form_submit_button("Annuleren")
+            if opslaan:
+                st.session_state["uren_data"][idx] = {
+                    "Bedrijf": bedrijf,
+                    "Dag": dag,
+                    "Datum": datum.strftime("%Y-%m-%d"),
+                    "Starttijd": starttijd,
+                    "Eindtijd": eindtijd,
+                    "Pauze (min)": pauze,
+                    "Uren": uren
+                }
+                save_uren()
+                del st.session_state["edit_row"]
+                st.experimental_rerun()
+            if annuleren:
+                del st.session_state["edit_row"]
+                st.experimental_rerun()
 
-        mask = (df['Datum_obj'] >= pd.to_datetime(start_datum)) & (df['Datum_obj'] <= pd.to_datetime(eind_datum))
-        df_periode = df.loc[mask].copy()
-        st.dataframe(df_periode.drop(columns=['Datum_obj']), use_container_width=True)
+        # Periodebeheer: 4-weken periodes
+        if "eerste_periode_start" not in st.session_state:
+            st.session_state["eerste_periode_start"] = None
+
+        st.subheader("Periode selectie (4 weken per periode)")
+        if st.session_state["eerste_periode_start"] is None:
+            eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
+            if st.button("Zet eerste periode"):
+                st.session_state["eerste_periode_start"] = eerste_start
+                st.success("Eerste periode ingesteld!")
+            st.stop()
+        else:
+            eerste_start = st.session_state["eerste_periode_start"]
+            st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
+            # Bepaal het aantal periodes tot nu toe
+            dagen_geleden = (date.today() - eerste_start).days
+            huidige_periode = 1 + dagen_geleden // 28
+            totaal_periodes = max(1, huidige_periode)
+            periode_keuze = st.selectbox("Kies periode", list(range(1, totaal_periodes+1)))
+            periode_start = eerste_start + timedelta(days=(periode_keuze-1)*28)
+            periode_eind = periode_start + timedelta(days=27)
+            st.info(f"Periode {periode_keuze}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
+            # Filter df_periode op deze periode:
+            mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
+            df_periode = df.loc[mask].copy()
 
         # Uurtarief ophalen per bedrijf
         def get_uurtarief(bedrijfsnaam):
