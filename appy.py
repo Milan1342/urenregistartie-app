@@ -30,10 +30,23 @@ st.set_page_config(page_title="Urenregistratie", layout="wide")
 # Persoonsgegevens defaults
 if "persoon" not in st.session_state:
     st.session_state["persoon"] = {
+        "naam": "",
         "geboortedatum": date(2000,1,1),
         "loonheffingskorting": True,
         "bruto_uurloon": 12.0
     }
+
+# Toon profiel in de sidebar
+persoon = st.session_state.get("persoon", {})
+with st.sidebar:
+    st.markdown("---")
+    st.markdown(
+        f'<div style="display:flex;align-items:center">'
+        f'<span style="font-size:2em; margin-right:0.5em;">👤</span>'
+        f'<span style="font-size:1.1em;">{persoon.get("naam", "Gebruiker")}</span>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
 # Centrale periode-instelling in de sidebar
 if "periode_start" not in st.session_state:
@@ -104,27 +117,30 @@ def parse_row(row: str, default_year: int, bedrijf: str) -> dict | None:
 
 # ------------------ Persoonsgegevens ------------------
 if pagina == "Persoonsgegevens":
-    st.title("Persoonsgegevens voor loonheffing (geschat)")
+    st.title("Persoonsgegevens")
     with st.form("persoon_form"):
-        geboortedatum = st.date_input("Geboortedatum", value=st.session_state["persoon"]["geboortedatum"])
-        loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=st.session_state["persoon"]["loonheffingskorting"])
-        bruto_uurloon = st.number_input("Bruto uurloon (€)", min_value=0.0, value=st.session_state["persoon"]["bruto_uurloon"], step=0.1)
+        naam = st.text_input("Naam", value=st.session_state["persoon"].get("naam", ""))
+        geboortedatum = st.date_input("Geboortedatum", value=st.session_state["persoon"].get("geboortedatum", date(2000,1,1)))
+        loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=st.session_state["persoon"].get("loonheffingskorting", True))
+        bruto_uurloon = st.number_input("Bruto uurloon (€)", min_value=0.0, value=st.session_state["persoon"].get("bruto_uurloon", 12.0), step=0.1)
         opslaan = st.form_submit_button("Opslaan")
 
         if opslaan:
+            st.session_state["persoon"]["naam"] = naam
             st.session_state["persoon"]["geboortedatum"] = geboortedatum
             st.session_state["persoon"]["loonheffingskorting"] = loonheffingskorting
             st.session_state["persoon"]["bruto_uurloon"] = bruto_uurloon
             st.success("Persoonsgegevens opgeslagen.")
 
     vandaag = date.today()
-    leeftijd = vandaag.year - st.session_state["persoon"]["geboortedatum"].year - (
-        (vandaag.month, vandaag.day) < (st.session_state["persoon"]["geboortedatum"].month, st.session_state["persoon"]["geboortedatum"].day)
+    geboortedatum = st.session_state["persoon"].get("geboortedatum", date(2000,1,1))
+    leeftijd = vandaag.year - geboortedatum.year - (
+        (vandaag.month, vandaag.day) < (geboortedatum.month, geboortedatum.day)
     )
     # Eenvoudige schatting
     if leeftijd < 21:
         schatting = 0.10
-    elif not st.session_state["persoon"]["loonheffingskorting"]:
+    elif not st.session_state["persoon"].get("loonheffingskorting", True):
         schatting = 0.40
     else:
         schatting = 0.36
@@ -236,6 +252,12 @@ elif pagina == "Overzicht":
     data = st.session_state["uren_data"]
     bedrijven = st.session_state["bedrijven"]
 
+    def heeft_loonheffing(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b.get("loonheffing", False)
+        return False
+
     if data and bedrijven:
         df = pd.DataFrame(data)
         df['Datum_obj'] = pd.to_datetime(df['Datum'])
@@ -269,7 +291,11 @@ elif pagina == "Overzicht":
 
         # Loonheffingspercentage uit persoonsgegevens
         schatting = st.session_state["persoon"].get("loonheffingspercentage", 0.36)
-        df_periode["NettoBedrag"] = df_periode["Bedrag"] * (1 - schatting)
+        df_periode["LoonheffingAanwezig"] = df_periode["Bedrijf"].apply(heeft_loonheffing)
+        df_periode["NettoBedrag"] = df_periode.apply(
+            lambda row: row["Bedrag"] * (1 - schatting) if row["LoonheffingAanwezig"] else row["Bedrag"],
+            axis=1
+        )
 
         totaal_uren = df_periode['Uren'].sum()
         totaal_bedrag = df_periode['Bedrag'].sum()
