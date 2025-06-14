@@ -208,15 +208,14 @@ elif pagina == "Overzicht":
             gekozen_week = st.selectbox("Kies weeknummer", weeknummers)
             week_df = df_periode[df_periode['Week'] == gekozen_week]
 
-            # Maak tekst voor kopiëren
+            # Maak tekst voor kopiëren (zonder bedrijf, bedrag of totaal)
             kopieer_tekst = "\n".join(
-                f"{row['Bedrijf']} | {row['Dag']} {row['Datum']} {row['Starttijd']}-{row['Eindtijd']} ({row['Uren']} uur, €{row['Bedrag']:.2f})"
+                f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
                 for _, row in week_df.iterrows()
             )
-            kopieer_tekst += f"\nTotaal: {week_df['Uren'].sum():.2f} uur, €{week_df['Bedrag'].sum():.2f}"
-
+            
             st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
-
+            
         # Download knop
         excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
         st.download_button(
