@@ -58,61 +58,62 @@ def parse_row(row: str, default_year: int) -> dict | None:
 if pagina == "Uren invoeren":
     st.title("Uren invoeren")
 
-    st.markdown("""
-    **Optie 1:** Plak hieronder je notities, bijvoorbeeld:
+    invoermethode = st.radio(
+        "Kies je invoermethode:",
+        ("Handmatig invullen", "Plakken uit notities")
+    )
 
-    ```
-    Ma- 14 apr 12.30/20.30(30) 7.5uur
-    Di- 15 apr 12.00/20.30(60) 7.5 uur
-    ...
-    Totaal: 15 uur, €180 netto
-    ```
-    """)
+    if invoermethode == "Handmatig invullen":
+        with st.form("uren_formulier", clear_on_submit=True):
+            dag = st.selectbox("Dag", ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"])
+            datum = st.date_input("Datum", date.today())
+            starttijd = st.time_input("Starttijd", time(9, 0))
+            eindtijd = st.time_input("Eindtijd", time(17, 0))
+            pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
+            toevoegen = st.form_submit_button("Toevoegen")
 
-    input_text = st.text_area("Plak hier je uren:", height=150)
+            # Automatische berekening gewerkte uren
+            start_dt = datetime.combine(date.today(), starttijd)
+            eind_dt = datetime.combine(date.today(), eindtijd)
+            diff = (eind_dt - start_dt).total_seconds() / 3600  # verschil in uren
+            uren = max(0, diff - pauze / 60)
 
-    # Handmatig toevoegen via formulier (uren automatisch berekend)
-    st.markdown("**Optie 2:** Vul handmatig je uren in")
-    with st.form("uren_formulier", clear_on_submit=True):
-        dag = st.selectbox("Dag", ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"])
-        datum = st.date_input("Datum", date.today())
-        starttijd = st.time_input("Starttijd", time(9, 0))
-        eindtijd = st.time_input("Eindtijd", time(17, 0))
-        pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
-        toevoegen = st.form_submit_button("Toevoegen")
+            st.info(f"Gewerkte uren (excl. pauze): {uren:.2f}")
 
-        # Automatische berekening gewerkte uren
-        start_dt = datetime.combine(date.today(), starttijd)
-        eind_dt = datetime.combine(date.today(), eindtijd)
-        diff = (eind_dt - start_dt).total_seconds() / 3600  # verschil in uren
-        uren = max(0, diff - pauze / 60)
+            if toevoegen:
+                st.session_state["uren_data"].append({
+                    "Dag": dag,
+                    "Datum": datum.strftime("%Y-%m-%d"),
+                    "Starttijd": starttijd.strftime("%H:%M"),
+                    "Eindtijd": eindtijd.strftime("%H:%M"),
+                    "Pauze (min)": pauze,
+                    "Uren": uren
+                })
 
-        st.info(f"Gewerkte uren (excl. pauze): {uren:.2f}")
+    elif invoermethode == "Plakken uit notities":
+        st.markdown("""
+        Plak hieronder je notities, bijvoorbeeld:
 
-        if toevoegen:
-            st.session_state["uren_data"].append({
-                "Dag": dag,
-                "Datum": datum.strftime("%Y-%m-%d"),
-                "Starttijd": starttijd.strftime("%H:%M"),
-                "Eindtijd": eindtijd.strftime("%H:%M"),
-                "Pauze (min)": pauze,
-                "Uren": uren
-            })
-
-    # Verwerk geplakte tekst
-    fouten = []
-    if input_text:
-        rows = input_text.strip().split('\n')
-        default_year = datetime.now().year
-        for i, row in enumerate(rows, 1):
-            parsed = parse_row(row, default_year)
-            if parsed:
-                st.session_state["uren_data"].append(parsed)
-            elif row.strip() and not row.lower().startswith("totaal"):
-                fouten.append(f"Regel {i} niet herkend: {row}")
-
-    if fouten:
-        st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
+        ```
+        Ma- 14 apr 12.30/20.30(30) 7.5uur
+        Di- 15 apr 12.00/20.30(60) 7.5 uur
+        ...
+        Totaal: 15 uur, €180 netto
+        ```
+        """)
+        input_text = st.text_area("Plak hier je uren:", height=200)
+        fouten = []
+        if st.button("Toevoegen uit tekst"):
+            rows = input_text.strip().split('\n')
+            default_year = datetime.now().year
+            for i, row in enumerate(rows, 1):
+                parsed = parse_row(row, default_year)
+                if parsed:
+                    st.session_state["uren_data"].append(parsed)
+                elif row.strip() and not row.lower().startswith("totaal"):
+                    fouten.append(f"Regel {i} niet herkend: {row}")
+            if fouten:
+                st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
 
 elif pagina == "Overzicht":
     st.title("Overzicht")
