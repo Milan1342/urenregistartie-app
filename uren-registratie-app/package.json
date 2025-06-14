@@ -1,0 +1,23 @@
+{
+  "name": "uren-registratie-app",
+  "version": "1.0.0",
+  "description": "A time registration app that automates and organizes work hour notes.",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "ts-node src/main.ts",
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "ts-node": "^10.0.0",
+    "typescript": "^4.0.0",
+    "jest": "^27.0.0",
+    "ts-jest": "^27.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^27.0.0",
+    "@types/node": "^16.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
