@@ -132,12 +132,12 @@ elif pagina == "Uren invoeren":
             "Kies je invoermethode:",
             ("Handmatig invullen", "Plakken uit notities")
         )
-
         if invoermethode == "Handmatig invullen":
             with st.form("uren_formulier", clear_on_submit=True):
                 bedrijf = st.selectbox("Bedrijf", bedrijven_namen)
-                dag = st.selectbox("Dag", ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"])
                 datum = st.date_input("Datum", date.today())
+                dag = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"][datum.weekday()]
+                st.info(f"Dag: {dag}")
                 starttijd = st.time_input("Starttijd", time(9, 0))
                 eindtijd = st.time_input("Eindtijd", time(17, 0))
                 pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
@@ -162,23 +162,21 @@ elif pagina == "Uren invoeren":
                         "Uren": uren
                     })
                     save_uren()
+                elif invoermethode == "Plakken uit notities":
+                    bedrijf = st.selectbox("Bedrijf", bedrijven_namen, key="bedrijf_plak")
+                    st.markdown("""hieronder je notities, bijvoorbeeld:
 
-        elif invoermethode == "Plakken uit notities":
-            bedrijf = st.selectbox("Bedrijf", bedrijven_namen, key="bedrijf_plak")
-            st.markdown("""
-            Plak hieronder je notities, bijvoorbeeld:
-
-            ```
-            Ma- 14 apr 12.30/20.30(30) 7.5uur
-            Di- 15 apr 12.00/20.30(60) 7.5 uur
-            ...
-            Totaal: 15 uur, €180 netto
-            ```
-            """)
-            input_text = st.text_area("Plak hier je uren:", height=200)
-            fouten = []
-            if st.button("Toevoegen uit tekst"):
-                rows = input_text.strip().split('\n')
+                    ```
+                    Ma- 14 apr 12.30/20.30(30) 7.5uur
+                 Di- 15 apr 12.00/20.30(60) 7.5 uur
+                    ...
+                 Totaal: 15 uur, €180 netto
+                    ```
+                    """)
+                input_text = st.text_area("Plak hier je uren:", height=200)
+                fouten = []
+                if st.button("Toevoegen uit tekst"):
+                    rows = input_text.strip().split('\n')
                 default_year = datetime.now().year
                 for i, row in enumerate(rows, 1):
                     parsed = parse_row(row, default_year, bedrijf)
