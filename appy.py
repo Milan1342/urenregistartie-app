@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
@@ -23,8 +23,8 @@ uurtarief = st.number_input("Uurtarief netto (€)", min_value=0.0, value=12.0, 
 
 pattern = re.compile(
     r"(?P<dag>\w{2})-\s*(?P<datum>\d{1,2}\s\w{3}(?:\s\d{4})?)\s+"
-    r"(?P<start>\d{1,2}[.:]\d{2})\s*/\s*(?P<eind>\d{1,2}[.:]\d{2})"
-    r"\((?P<pauze>\d+)\)\s+(?P<uren>[\d.,]+)\s*uur",
+    r"(?P<start>\d{1,2}[.:]\d{2})\s*/\s*(?P<eind>\d{1,2}[.:]\d{2})\s*"
+    r"\(\s*(?P<pauze>\d+)\s*\)\s+(?P<uren>[\d.,]+)\s*uur",
     re.IGNORECASE
 )
 
@@ -77,20 +77,48 @@ if input_text:
 
     if data:
         df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True)
-        totaal_uren = df['Uren'].sum()
+        df['Datum_obj'] = pd.to_datetime(df['Datum'])
+
+        # Periode filter
+        st.subheader("Kies een periode")
+        min_datum = df['Datum_obj'].min().date()
+        max_datum = df['Datum_obj'].max().date()
+        start_datum = st.date_input("Startdatum", min_datum, min_value=min_datum, max_value=max_datum)
+        eind_datum = st.date_input("Einddatum", max_datum, min_value=min_datum, max_value=max_datum)
+
+        mask = (df['Datum_obj'] >= pd.to_datetime(start_datum)) & (df['Datum_obj'] <= pd.to_datetime(eind_datum))
+        df_periode = df.loc[mask].copy()
+        st.dataframe(df_periode.drop(columns=['Datum_obj']), use_container_width=True)
+
+        totaal_uren = df_periode['Uren'].sum()
         geschat_bedrag = totaal_uren * uurtarief
 
         st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
         st.metric("Geschat netto bedrag", f"€{geschat_bedrag:.2f}")
 
-        # Overzicht per week
-        st.subheader("Uren per week")
-        weekoverzicht = df.groupby("Week")["Uren"].sum().reset_index()
+        # Weekoverzicht
+        st.subheader("Weekoverzicht")
+        weekoverzicht = df_periode.groupby("Week")["Uren"].sum().reset_index()
         st.dataframe(weekoverzicht)
 
+        # Selecteer week en kopieer uren
+        st.subheader("Kopieer je weekoverzicht")
+        weeknummers = weekoverzicht['Week'].tolist()
+        if weeknummers:
+            gekozen_week = st.selectbox("Kies weeknummer", weeknummers)
+            week_df = df_periode[df_periode['Week'] == gekozen_week]
+
+            # Maak tekst voor kopiëren
+            kopieer_tekst = "\n".join(
+                f"{row['Dag']} {row['Datum']} {row['Starttijd']}-{row['Eindtijd']} ({row['Uren']} uur)"
+                for _, row in week_df.iterrows()
+            )
+            kopieer_tekst += f"\nTotaal: {week_df['Uren'].sum():.2f} uur"
+
+            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
+
         # Download knop
-        excel_bytes = to_excel(df)
+        excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
         st.download_button(
             label="Download als Excel",
             data=excel_bytes,
