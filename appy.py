@@ -324,10 +324,19 @@ elif pagina == "Overzicht":
                 st.session_state["eerste_periode_start"] = eerste_start
                 save_eerste_periode(eerste_start)
                 st.success("Eerste periode ingesteld!")
+                st.experimental_rerun()
             st.stop()
         else:
             eerste_start = st.session_state["eerste_periode_start"]
             st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
+            if st.button("Wijzig eerste periode"):
+                nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
+                if st.button("Opslaan nieuwe eerste periode"):
+                    st.session_state["eerste_periode_start"] = nieuwe_start
+                    save_eerste_periode(nieuwe_start)
+                    st.success("Eerste periode aangepast!")
+                    st.experimental_rerun()
+                st.stop()
             # Bepaal het aantal periodes tot nu toe
             dagen_geleden = (date.today() - eerste_start).days
             huidige_periode = 1 + dagen_geleden // 28
@@ -380,26 +389,36 @@ elif pagina == "Overzicht":
         st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
         st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
 
-        # Weekoverzicht
+        # Weekoverzicht met datums achter weeknummer
         st.subheader("Weekoverzicht")
+        def week_datum_range(weeknr):
+            week_df = df_periode[df_periode['Week'] == weeknr]
+            if week_df.empty:
+                return ""
+            start = week_df['Datum_obj'].min().strftime('%d-%m-%Y')
+            eind = week_df['Datum_obj'].max().strftime('%d-%m-%Y')
+            return f"{start} t/m {eind}"
+
         weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
-        st.dataframe(weekoverzicht)
+        weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+        weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
+        st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
 
         # Selecteer week en kopieer uren
         st.subheader("Kopieer je weekoverzicht")
         weeknummers = weekoverzicht['Week'].tolist()
+        weeklabels = weekoverzicht['Weeknummer'].tolist()
         if weeknummers:
-            gekozen_week = st.selectbox("Kies weeknummer", weeknummers)
+            gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
+            gekozen_week = weeknummers[gekozen_idx]
             week_df = df_periode[df_periode['Week'] == gekozen_week]
 
-            # Maak tekst voor kopiëren (zonder bedrijf, bedrag of totaal)
             kopieer_tekst = "\n".join(
                 f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
                 for _, row in week_df.iterrows()
             )
-            
             st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
-            
+
         # Download knop
         excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
         st.download_button(
