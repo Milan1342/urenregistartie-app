@@ -47,21 +47,6 @@ if "data_loaded" not in st.session_state:
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
-# Centrale periode-instelling in de sidebar
-if "periode_start" not in st.session_state:
-    st.session_state["periode_start"] = date.today()
-if "periode_eind" not in st.session_state:
-    st.session_state["periode_eind"] = date.today()
-
-with st.sidebar.expander("Periode instellen", expanded=True):
-    st.write("Stel hier de standaard periode in voor overzichten en filters.")
-    periode_start = st.date_input("Periode start", st.session_state["periode_start"], key="periode_start_input")
-    periode_eind = st.date_input("Periode eind", st.session_state["periode_eind"], key="periode_eind_input")
-    if st.button("Periode opslaan"):
-        st.session_state["periode_start"] = periode_start
-        st.session_state["periode_eind"] = periode_eind
-        st.success("Periode opgeslagen!")
-
 pagina = st.sidebar.radio(
     "Ga naar pagina:",
     ("Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens")
