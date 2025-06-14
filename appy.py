@@ -27,6 +27,14 @@ if "data_loaded" not in st.session_state:
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
+# Persoonsgegevens defaults
+if "persoon" not in st.session_state:
+    st.session_state["persoon"] = {
+        "geboortedatum": date(2000,1,1),
+        "loonheffingskorting": True,
+        "bruto_uurloon": 12.0
+    }
+
 # Centrale periode-instelling in de sidebar
 if "periode_start" not in st.session_state:
     st.session_state["periode_start"] = date.today()
@@ -44,7 +52,7 @@ with st.sidebar.expander("Periode instellen", expanded=True):
 
 pagina = st.sidebar.radio(
     "Ga naar pagina:",
-    ("Uren invoeren", "Overzicht", "Bedrijven beheren")
+    ("Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens")
 )
 
 if "uren_data" not in st.session_state:
@@ -94,8 +102,38 @@ def parse_row(row: str, default_year: int, bedrijf: str) -> dict | None:
         }
     return None
 
+# ------------------ Persoonsgegevens ------------------
+if pagina == "Persoonsgegevens":
+    st.title("Persoonsgegevens voor loonheffing (geschat)")
+    with st.form("persoon_form"):
+        geboortedatum = st.date_input("Geboortedatum", value=st.session_state["persoon"]["geboortedatum"])
+        loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=st.session_state["persoon"]["loonheffingskorting"])
+        bruto_uurloon = st.number_input("Bruto uurloon (€)", min_value=0.0, value=st.session_state["persoon"]["bruto_uurloon"], step=0.1)
+        opslaan = st.form_submit_button("Opslaan")
+
+        if opslaan:
+            st.session_state["persoon"]["geboortedatum"] = geboortedatum
+            st.session_state["persoon"]["loonheffingskorting"] = loonheffingskorting
+            st.session_state["persoon"]["bruto_uurloon"] = bruto_uurloon
+            st.success("Persoonsgegevens opgeslagen.")
+
+    vandaag = date.today()
+    leeftijd = vandaag.year - st.session_state["persoon"]["geboortedatum"].year - (
+        (vandaag.month, vandaag.day) < (st.session_state["persoon"]["geboortedatum"].month, st.session_state["persoon"]["geboortedatum"].day)
+    )
+    # Eenvoudige schatting
+    if leeftijd < 21:
+        schatting = 0.10
+    elif not st.session_state["persoon"]["loonheffingskorting"]:
+        schatting = 0.40
+    else:
+        schatting = 0.36
+
+    st.info(f"Geschat loonheffingspercentage: {schatting*100:.1f}%")
+    st.session_state["persoon"]["loonheffingspercentage"] = schatting
+
 # ------------------ Bedrijven beheren ------------------
-if pagina == "Bedrijven beheren":
+elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief en loonheffing.")
 
@@ -229,15 +267,21 @@ elif pagina == "Overzicht":
         df_periode["Uurtarief"] = df_periode["Bedrijf"].apply(get_uurtarief)
         df_periode["Bedrag"] = df_periode["Uren"] * df_periode["Uurtarief"]
 
+        # Loonheffingspercentage uit persoonsgegevens
+        schatting = st.session_state["persoon"].get("loonheffingspercentage", 0.36)
+        df_periode["NettoBedrag"] = df_periode["Bedrag"] * (1 - schatting)
+
         totaal_uren = df_periode['Uren'].sum()
         totaal_bedrag = df_periode['Bedrag'].sum()
+        totaal_nettobedrag = df_periode['NettoBedrag'].sum()
 
         st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
-        st.metric("Totaal bedrag", f"€{totaal_bedrag:.2f}")
+        st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
+        st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
 
         # Weekoverzicht
         st.subheader("Weekoverzicht")
-        weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag"]].sum().reset_index()
+        weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
         st.dataframe(weekoverzicht)
 
         # Selecteer week en kopieer uren
