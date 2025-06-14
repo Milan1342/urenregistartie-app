@@ -1,14 +1,17 @@
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime
+from datetime import datetime, date, time
 from io import BytesIO
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 st.title("Urenregistratie Automatisering")
 
+if "uren_data" not in st.session_state:
+    st.session_state["uren_data"] = []
+
 st.markdown("""
-Plak hieronder je notities, bijvoorbeeld:
+**Optie 1:** Plak hieronder je notities, bijvoorbeeld:
 
 ```
 Ma- 14 apr 12.30/20.30(30) 7.5uur
@@ -18,7 +21,7 @@ Totaal: 15 uur, €180 netto
 ```
 """)
 
-input_text = st.text_area("Plak hier je uren:", height=300)
+input_text = st.text_area("Plak hier je uren:", height=150)
 uurtarief = st.number_input("Uurtarief netto (€)", min_value=0.0, value=12.0, step=0.5)
 
 pattern = re.compile(
@@ -62,68 +65,90 @@ def to_excel(df: pd.DataFrame) -> bytes:
 def weeknummer(datum: str) -> int:
     return datetime.strptime(datum, "%Y-%m-%d").isocalendar()[1]
 
+# Optie 2: Handmatig toevoegen via formulier
+st.markdown("**Optie 2:** Vul handmatig je uren in")
+with st.form("uren_formulier", clear_on_submit=True):
+    dag = st.selectbox("Dag", ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"])
+    datum = st.date_input("Datum", date.today())
+    starttijd = st.time_input("Starttijd", time(9, 0))
+    eindtijd = st.time_input("Eindtijd", time(17, 0))
+    pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
+    uren = st.number_input("Gewerkte uren (excl. pauze)", min_value=0.0, step=0.25)
+    toevoegen = st.form_submit_button("Toevoegen")
+
+    if toevoegen:
+        st.session_state["uren_data"].append({
+            "Dag": dag,
+            "Datum": datum.strftime("%Y-%m-%d"),
+            "Starttijd": starttijd.strftime("%H:%M"),
+            "Eindtijd": eindtijd.strftime("%H:%M"),
+            "Pauze (min)": pauze,
+            "Uren": uren
+        })
+
+# Verwerk geplakte tekst
+data = st.session_state["uren_data"].copy()
+fouten = []
 if input_text:
     rows = input_text.strip().split('\n')
     default_year = datetime.now().year
-    data = []
-    fouten = []
     for i, row in enumerate(rows, 1):
         parsed = parse_row(row, default_year)
         if parsed:
-            parsed["Week"] = weeknummer(parsed["Datum"])
             data.append(parsed)
         elif row.strip() and not row.lower().startswith("totaal"):
             fouten.append(f"Regel {i} niet herkend: {row}")
 
-    if data:
-        df = pd.DataFrame(data)
-        df['Datum_obj'] = pd.to_datetime(df['Datum'])
+if data:
+    df = pd.DataFrame(data)
+    df['Datum_obj'] = pd.to_datetime(df['Datum'])
+    df['Week'] = df['Datum_obj'].dt.isocalendar().week
 
-        # Periode filter
-        st.subheader("Kies een periode")
-        min_datum = df['Datum_obj'].min().date()
-        max_datum = df['Datum_obj'].max().date()
-        start_datum = st.date_input("Startdatum", min_datum, min_value=min_datum, max_value=max_datum)
-        eind_datum = st.date_input("Einddatum", max_datum, min_value=min_datum, max_value=max_datum)
+    # Periode filter
+    st.subheader("Kies een periode")
+    min_datum = df['Datum_obj'].min().date()
+    max_datum = df['Datum_obj'].max().date()
+    start_datum = st.date_input("Startdatum", min_datum, min_value=min_datum, max_value=max_datum, key="start")
+    eind_datum = st.date_input("Einddatum", max_datum, min_value=min_datum, max_value=max_datum, key="end")
 
-        mask = (df['Datum_obj'] >= pd.to_datetime(start_datum)) & (df['Datum_obj'] <= pd.to_datetime(eind_datum))
-        df_periode = df.loc[mask].copy()
-        st.dataframe(df_periode.drop(columns=['Datum_obj']), use_container_width=True)
+    mask = (df['Datum_obj'] >= pd.to_datetime(start_datum)) & (df['Datum_obj'] <= pd.to_datetime(eind_datum))
+    df_periode = df.loc[mask].copy()
+    st.dataframe(df_periode.drop(columns=['Datum_obj']), use_container_width=True)
 
-        totaal_uren = df_periode['Uren'].sum()
-        geschat_bedrag = totaal_uren * uurtarief
+    totaal_uren = df_periode['Uren'].sum()
+    geschat_bedrag = totaal_uren * uurtarief
 
-        st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
-        st.metric("Geschat netto bedrag", f"€{geschat_bedrag:.2f}")
+    st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
+    st.metric("Geschat netto bedrag", f"€{geschat_bedrag:.2f}")
 
-        # Weekoverzicht
-        st.subheader("Weekoverzicht")
-        weekoverzicht = df_periode.groupby("Week")["Uren"].sum().reset_index()
-        st.dataframe(weekoverzicht)
+    # Weekoverzicht
+    st.subheader("Weekoverzicht")
+    weekoverzicht = df_periode.groupby("Week")["Uren"].sum().reset_index()
+    st.dataframe(weekoverzicht)
 
-        # Selecteer week en kopieer uren
-        st.subheader("Kopieer je weekoverzicht")
-        weeknummers = weekoverzicht['Week'].tolist()
-        if weeknummers:
-            gekozen_week = st.selectbox("Kies weeknummer", weeknummers)
-            week_df = df_periode[df_periode['Week'] == gekozen_week]
+    # Selecteer week en kopieer uren
+    st.subheader("Kopieer je weekoverzicht")
+    weeknummers = weekoverzicht['Week'].tolist()
+    if weeknummers:
+        gekozen_week = st.selectbox("Kies weeknummer", weeknummers)
+        week_df = df_periode[df_periode['Week'] == gekozen_week]
 
-            # Maak tekst voor kopiëren
-            kopieer_tekst = "\n".join(
-                f"{row['Dag']} {row['Datum']} {row['Starttijd']}-{row['Eindtijd']} ({row['Uren']} uur)"
-                for _, row in week_df.iterrows()
-            )
-            kopieer_tekst += f"\nTotaal: {week_df['Uren'].sum():.2f} uur"
-
-            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
-
-        # Download knop
-        excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
-        st.download_button(
-            label="Download als Excel",
-            data=excel_bytes,
-            file_name="urenregistratie.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # Maak tekst voor kopiëren
+        kopieer_tekst = "\n".join(
+            f"{row['Dag']} {row['Datum']} {row['Starttijd']}-{row['Eindtijd']} ({row['Uren']} uur)"
+            for _, row in week_df.iterrows()
         )
-    if fouten:
-        st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
+        kopieer_tekst += f"\nTotaal: {week_df['Uren'].sum():.2f} uur"
+
+        st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
+
+    # Download knop
+    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
+    st.download_button(
+        label="Download als Excel",
+        data=excel_bytes,
+        file_name="urenregistratie.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+if fouten:
+    st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
