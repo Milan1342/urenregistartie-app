@@ -8,6 +8,7 @@ import os
 UREN_CSV = "uren_data.csv"
 BEDRIJVEN_CSV = "bedrijven.csv"
 PERSOON_CSV = "persoon.csv"
+EERSTE_PERIODE_CSV = "eerste_periode.csv"
 
 def load_data():
     if os.path.exists(UREN_CSV):
@@ -34,6 +35,16 @@ def load_persoon():
             st.session_state["persoon"]["naam"] = df.iloc[0]["naam"]
             st.session_state["persoon"]["geboortedatum"] = pd.to_datetime(df.iloc[0]["geboortedatum"]).date()
 
+def save_eerste_periode(dt):
+    pd.DataFrame([{"eerste_periode_start": dt}]).to_csv(EERSTE_PERIODE_CSV, index=False)
+
+def load_eerste_periode():
+    if os.path.exists(EERSTE_PERIODE_CSV):
+        df = pd.read_csv(EERSTE_PERIODE_CSV)
+        if not df.empty:
+            return pd.to_datetime(df.iloc[0]["eerste_periode_start"]).date()
+    return None
+
 # Laad data bij start
 if "data_loaded" not in st.session_state:
     load_data()
@@ -43,6 +54,7 @@ if "data_loaded" not in st.session_state:
             "geboortedatum": date(2000,1,1)
         }
     load_persoon()
+    st.session_state["eerste_periode_start"] = load_eerste_periode()
     st.session_state["data_loaded"] = True
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
@@ -304,15 +316,13 @@ elif pagina == "Overzicht":
                 del st.session_state["edit_row"]
                 st.experimental_rerun()
 
-        # Periodebeheer: 4-weken periodes
-        if "eerste_periode_start" not in st.session_state:
-            st.session_state["eerste_periode_start"] = None
-
+        # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
         st.subheader("Periode selectie (4 weken per periode)")
         if st.session_state["eerste_periode_start"] is None:
             eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
             if st.button("Zet eerste periode"):
                 st.session_state["eerste_periode_start"] = eerste_start
+                save_eerste_periode(eerste_start)
                 st.success("Eerste periode ingesteld!")
             st.stop()
         else:
@@ -322,10 +332,16 @@ elif pagina == "Overzicht":
             dagen_geleden = (date.today() - eerste_start).days
             huidige_periode = 1 + dagen_geleden // 28
             totaal_periodes = max(1, huidige_periode)
-            periode_keuze = st.selectbox("Kies periode", list(range(1, totaal_periodes+1)))
-            periode_start = eerste_start + timedelta(days=(periode_keuze-1)*28)
+            # Maak periode-opties met datums
+            periode_opties = []
+            for p in range(1, totaal_periodes+1):
+                p_start = eerste_start + timedelta(days=(p-1)*28)
+                p_eind = p_start + timedelta(days=27)
+                periode_opties.append(f"Periode {p} ({p_start.strftime('%d-%m-%Y')} t/m {p_eind.strftime('%d-%m-%Y')})")
+            periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
+            periode_start = eerste_start + timedelta(days=(periode_idx)*28)
             periode_eind = periode_start + timedelta(days=27)
-            st.info(f"Periode {periode_keuze}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
+            st.info(f"Periode {periode_idx+1}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
             # Filter df_periode op deze periode:
             mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
             df_periode = df.loc[mask].copy()
