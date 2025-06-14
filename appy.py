@@ -6,6 +6,21 @@ from io import BytesIO
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
+# Centrale periode-instelling in de sidebar
+if "periode_start" not in st.session_state:
+    st.session_state["periode_start"] = date.today()
+if "periode_eind" not in st.session_state:
+    st.session_state["periode_eind"] = date.today()
+
+with st.sidebar.expander("Periode instellen", expanded=True):
+    st.write("Stel hier de standaard periode in voor overzichten en filters.")
+    periode_start = st.date_input("Periode start", st.session_state["periode_start"], key="periode_start_input")
+    periode_eind = st.date_input("Periode eind", st.session_state["periode_eind"], key="periode_eind_input")
+    if st.button("Periode opslaan"):
+        st.session_state["periode_start"] = periode_start
+        st.session_state["periode_eind"] = periode_eind
+        st.success("Periode opgeslagen!")
+
 pagina = st.sidebar.radio(
     "Ga naar pagina:",
     ("Uren invoeren", "Overzicht", "Bedrijven beheren")
@@ -169,12 +184,11 @@ elif pagina == "Overzicht":
         if bedrijf_filter != "Alle bedrijven":
             df = df[df["Bedrijf"] == bedrijf_filter]
 
-        # Periode filter
-        st.subheader("Kies een periode")
-        min_datum = df['Datum_obj'].min().date()
-        max_datum = df['Datum_obj'].max().date()
-        start_datum = st.date_input("Startdatum", min_datum, min_value=min_datum, max_value=max_datum, key="start")
-        eind_datum = st.date_input("Einddatum", max_datum, min_value=min_datum, max_value=max_datum, key="end")
+        # Gebruik centrale periode
+        st.subheader("Periode")
+        start_datum = st.session_state["periode_start"]
+        eind_datum = st.session_state["periode_eind"]
+        st.info(f"Periode: {start_datum} t/m {eind_datum}")
 
         mask = (df['Datum_obj'] >= pd.to_datetime(start_datum)) & (df['Datum_obj'] <= pd.to_datetime(eind_datum))
         df_periode = df.loc[mask].copy()
