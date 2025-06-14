@@ -7,6 +7,7 @@ import os
 
 UREN_CSV = "uren_data.csv"
 BEDRIJVEN_CSV = "bedrijven.csv"
+PERSOON_CSV = "persoon.csv"
 
 def load_data():
     if os.path.exists(UREN_CSV):
@@ -20,19 +21,31 @@ def save_uren():
 def save_bedrijven():
     pd.DataFrame(st.session_state["bedrijven"]).to_csv(BEDRIJVEN_CSV, index=False)
 
+def save_persoon():
+    pd.DataFrame([{
+        "naam": st.session_state["persoon"].get("naam", ""),
+        "geboortedatum": st.session_state["persoon"].get("geboortedatum", date(2000,1,1))
+    }]).to_csv(PERSOON_CSV, index=False)
+
+def load_persoon():
+    if os.path.exists(PERSOON_CSV):
+        df = pd.read_csv(PERSOON_CSV)
+        if not df.empty:
+            st.session_state["persoon"]["naam"] = df.iloc[0]["naam"]
+            st.session_state["persoon"]["geboortedatum"] = pd.to_datetime(df.iloc[0]["geboortedatum"]).date()
+
 # Laad data bij start
 if "data_loaded" not in st.session_state:
     load_data()
+    if "persoon" not in st.session_state:
+        st.session_state["persoon"] = {
+            "naam": "",
+            "geboortedatum": date(2000,1,1)
+        }
+    load_persoon()
     st.session_state["data_loaded"] = True
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
-
-# Persoonsgegevens defaults
-if "persoon" not in st.session_state:
-    st.session_state["persoon"] = {
-        "naam": "",
-        "geboortedatum": date(2000,1,1)
-    }
 
 # Centrale periode-instelling in de sidebar
 if "periode_start" not in st.session_state:
@@ -120,6 +133,7 @@ if pagina == "Persoonsgegevens":
         if opslaan:
             st.session_state["persoon"]["naam"] = naam
             st.session_state["persoon"]["geboortedatum"] = geboortedatum
+            save_persoon()
             st.success("Persoonsgegevens opgeslagen.")
 
     vandaag = date.today()
@@ -135,7 +149,6 @@ if pagina == "Persoonsgegevens":
     else:
         schatting = 0.36
     st.session_state["persoon"]["loonheffingspercentage"] = schatting
-    st.info(f"Geschat loonheffingspercentage: {schatting*100:.1f}%")
 
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
@@ -215,11 +228,17 @@ elif pagina == "Uren invoeren":
             Plak hieronder je notities, bijvoorbeeld:
 
             ```
-            Ma- 14 apr 12.30/20.30(30) 7.5uur
+            Ma- 14 apr 12.30/20.30(30) 7.5 uur
             Di- 15 apr 12.00/20.30(60) 7.5 uur
-            ...
-            Totaal: 15 uur, €180 netto
+            Wo- 16 apr 12.00/20.30(60) 7.5 uur
             ```
+            let op de juiste opmaak:
+            - Dag (2 letters)
+            - Datum (dag, maand)
+            - Starttijd en eindtijd (hh:mm)
+            - Pauze in minuten tussen haakjes
+            - Uren (decimaal, met punt of komma)
+            - kijk goed naar de spaties en opmaak van het voorbeeld!
             """)
             input_text = st.text_area("Plak hier je uren:", height=200)
             fouten = []
