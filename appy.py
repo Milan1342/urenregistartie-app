@@ -206,7 +206,7 @@ if pagina == "Persoonsgegevens":
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
-    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum, actief-status, loonheffingspercentage en reiskostenvergoeding.")
+    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum, actief-status en loonstrookgegevens.")
 
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
@@ -218,9 +218,13 @@ elif pagina == "Bedrijven beheren":
         st.markdown("**Optioneel: vul je loonstrook in voor een nauwkeuriger percentage**")
         bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="bruto_nieuw")
         netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
-        reiskosten = st.number_input("Reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
-        if bruto > 0 and netto > 0 and netto <= bruto:
-            loonheffingspercentage = 1 - ((netto - reiskosten) / bruto)
+        reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
+        dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=1, key="dagen_nieuw")
+        if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
+            bruto_per_dag = bruto / dagen
+            netto_per_dag = (netto - reiskosten) / dagen
+            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+            st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
         else:
             loonheffingspercentage = st.number_input(
                 "Loonheffingspercentage (bijv. 0.0 voor geen belasting, 0.10 voor 10%)",
@@ -237,7 +241,10 @@ elif pagina == "Bedrijven beheren":
                 "startdatum": startdatum,
                 "actief": actief,
                 "loonheffingspercentage": loonheffingspercentage,
-                "reiskosten": reiskosten
+                "reiskosten": reiskosten,
+                "loonstrook_dagen": dagen,
+                "loonstrook_bruto": bruto,
+                "loonstrook_netto": netto
             })
             save_bedrijven()
             st.success(f"Bedrijf '{naam}' toegevoegd.")
@@ -253,9 +260,9 @@ elif pagina == "Bedrijven beheren":
             start = bedrijf.get("startdatum")
             if start:
                 start = pd.to_datetime(start).date()
-                dagen = (date.today() - start).days
-                jaren = dagen // 365
-                maanden = (dagen % 365) // 30
+                dagen_werk = (date.today() - start).days
+                jaren = dagen_werk // 365
+                maanden = (dagen_werk % 365) // 30
                 duur = f"{jaren} jaar, {maanden} maanden"
             else:
                 duur = "Onbekend"
@@ -264,7 +271,7 @@ elif pagina == "Bedrijven beheren":
             rk = bedrijf.get("reiskosten", 0.0)
             cols[0].markdown(
                 f"**{bedrijf['naam']}**<br>{actief_str}<br>Begonnen op {start} ({duur})"
-                f"<br>Loonheffingspercentage: {lhp*100:.2f}%<br>Reiskostenvergoeding: €{rk:.2f}",
+                f"<br>Loonheffingspercentage: {lhp*100:.2f}%<br>Reiskostenvergoeding (totaal): €{rk:.2f}",
                 unsafe_allow_html=True
             )
             if cols[1].button("✏️ Aanpassen", key=f"edit_bedrijf_{idx}"):
@@ -289,9 +296,13 @@ elif pagina == "Bedrijven beheren":
                 st.markdown("**Optioneel: vul je loonstrook in voor een nauwkeuriger percentage**")
                 bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"bruto_{idx}")
                 netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"netto_{idx}")
-                reiskosten = st.number_input("Reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"reiskosten_{idx}")
-                if bruto > 0 and netto > 0 and netto <= bruto:
-                    loonheffingspercentage = 1 - ((netto - reiskosten) / bruto)
+                reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"reiskosten_{idx}")
+                dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=int(bedrijf.get("loonstrook_dagen", 1)), key=f"dagen_{idx}")
+                if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
+                    bruto_per_dag = bruto / dagen
+                    netto_per_dag = (netto - reiskosten) / dagen
+                    loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+                    st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
                 else:
                     loonheffingspercentage = st.number_input(
                         "Loonheffingspercentage (bijv. 0.0 voor geen belasting, 0.10 voor 10%)",
@@ -308,7 +319,10 @@ elif pagina == "Bedrijven beheren":
                     "startdatum": startdatum,
                     "actief": actief,
                     "loonheffingspercentage": loonheffingspercentage,
-                    "reiskosten": reiskosten
+                    "reiskosten": reiskosten,
+                    "loonstrook_dagen": dagen,
+                    "loonstrook_bruto": bruto,
+                    "loonstrook_netto": netto
                 }
                 save_bedrijven()
                 del st.session_state["edit_bedrijf"]
