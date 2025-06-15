@@ -420,8 +420,8 @@ elif pagina == "Uren invoeren":
 elif pagina == "Overzicht":
     st.title("Overzicht")
 
-    data = st.session_state["uren_data"]
-    bedrijven = st.session_state["bedrijven"]
+    data = st.session_state.get("uren_data", [])
+    bedrijven = st.session_state.get("bedrijven", [])
 
     def get_loonheffingspercentage(bedrijfsnaam):
         for b in bedrijven:
@@ -429,164 +429,191 @@ elif pagina == "Overzicht":
                 return b.get("loonheffingspercentage", 0.10)
         return 0.10
 
-    if data and bedrijven:
-        df = pd.DataFrame(data)
-        df['Datum_obj'] = pd.to_datetime(df['Datum'])
-        df['Week'] = df['Datum_obj'].dt.isocalendar().week
+    if not bedrijven:
+        st.warning("Er zijn nog geen bedrijven toegevoegd. Voeg eerst bedrijven toe onder 'Bedrijven beheren'.")
+        st.stop()
+    if not data:
+        st.warning("Er zijn nog geen uren ingevoerd. Voeg eerst uren toe onder 'Uren invoeren'.")
+        st.stop()
 
-        # Toevoegen: Uren aanpassen/verwijderen
-        st.subheader("Uren aanpassen of verwijderen")
-        for i, row in df.iterrows():
-            cols = st.columns([2,2,2,2,2,2,2,1,1])
-            for j, col in enumerate(["Bedrijf","Dag","Datum","Starttijd","Eindtijd","Pauze (min)","Uren"]):
-                cols[j].write(str(row[col]))
-            if cols[-2].button("✏️", key=f"edit_{i}"):
-                st.session_state["edit_row"] = i
-            if cols[-1].button("🗑️", key=f"del_{i}"):
-                st.session_state["uren_data"].pop(i)
-                save_uren()
-                st.rerun()
+    df = pd.DataFrame(data)
+    if df.empty:
+        st.warning("Er zijn geen uren gevonden in de database.")
+        st.stop()
 
-        # Bewerken van een regel
-        if "edit_row" in st.session_state:
-            idx = st.session_state["edit_row"]
-            edit_row = st.session_state["uren_data"][idx]
-            st.info("Pas de gegevens aan en klik op 'Opslaan'")
-            with st.form("edit_form"):
-                bedrijf = st.text_input("Bedrijf", value=edit_row["Bedrijf"])
-                dag = st.text_input("Dag", value=edit_row["Dag"])
-                datum = st.date_input("Datum", value=pd.to_datetime(edit_row["Datum"]).date())
-                starttijd = st.text_input("Starttijd", value=edit_row["Starttijd"])
-                eindtijd = st.text_input("Eindtijd", value=edit_row["Eindtijd"])
-                pauze = st.number_input("Pauze (min)", value=int(edit_row["Pauze (min)"]))
-                uren = st.number_input("Uren", value=float(edit_row["Uren"]))
-                opslaan = st.form_submit_button("Opslaan")
-                annuleren = st.form_submit_button("Annuleren")
-            if opslaan:
-                st.session_state["uren_data"][idx] = {
-                    "Bedrijf": bedrijf,
-                    "Dag": dag,
-                    "Datum": datum.strftime("%Y-%m-%d"),
-                    "Starttijd": starttijd,
-                    "Eindtijd": eindtijd,
-                    "Pauze (min)": pauze,
-                    "Uren": uren
-                }
-                save_uren()
-                del st.session_state["edit_row"]
-                st.rerun()
-            if annuleren:
-                del st.session_state["edit_row"]
-                st.rerun()
+    # Controleer of alle benodigde kolommen aanwezig zijn
+    benodigde_kolommen = ["Bedrijf", "Dag", "Datum", "Starttijd", "Eindtijd", "Pauze (min)", "Uren"]
+    for kol in benodigde_kolommen:
+        if kol not in df.columns:
+            st.error(f"Kolom '{kol}' ontbreekt in de data. Controleer je CSV-bestanden.")
+            st.stop()
 
-        # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
-        st.subheader("Periode selectie (4 weken per periode)")
-        if st.session_state["eerste_periode_start"] is None:
-            eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
-            if st.button("Zet eerste periode"):
-                save_eerste_periode(eerste_start)
-                st.success("Eerste periode ingesteld!")
+    # Datum parsing en weeknummer
+    df['Datum_obj'] = pd.to_datetime(df['Datum'], errors='coerce')
+    df = df.dropna(subset=['Datum_obj'])
+    if df.empty:
+        st.warning("Geen geldige datums gevonden in je uren. Controleer je invoer.")
+        st.stop()
+    df['Week'] = df['Datum_obj'].dt.isocalendar().week
+
+    # Toevoegen: Uren aanpassen/verwijderen
+    st.subheader("Uren aanpassen of verwijderen")
+    for i, row in df.iterrows():
+        cols = st.columns([2,2,2,2,2,2,2,1,1])
+        for j, col in enumerate(benodigde_kolommen):
+            cols[j].write(str(row[col]))
+        if cols[-2].button("✏️", key=f"edit_{i}"):
+            st.session_state["edit_row"] = i
+        if cols[-1].button("🗑️", key=f"del_{i}"):
+            st.session_state["uren_data"].pop(i)
+            save_uren()
+            st.rerun()
+
+    # Bewerken van een regel
+    if "edit_row" in st.session_state:
+        idx = st.session_state["edit_row"]
+        if idx >= len(st.session_state["uren_data"]):
+            del st.session_state["edit_row"]
+            st.rerun()
+        edit_row = st.session_state["uren_data"][idx]
+        st.info("Pas de gegevens aan en klik op 'Opslaan'")
+        with st.form("edit_form"):
+            bedrijf = st.text_input("Bedrijf", value=edit_row["Bedrijf"])
+            dag = st.text_input("Dag", value=edit_row["Dag"])
+            datum = st.date_input("Datum", value=pd.to_datetime(edit_row["Datum"]).date())
+            starttijd = st.text_input("Starttijd", value=edit_row["Starttijd"])
+            eindtijd = st.text_input("Eindtijd", value=edit_row["Eindtijd"])
+            pauze = st.number_input("Pauze (min)", value=int(edit_row["Pauze (min)"]))
+            uren = st.number_input("Uren", value=float(edit_row["Uren"]))
+            opslaan = st.form_submit_button("Opslaan")
+            annuleren = st.form_submit_button("Annuleren")
+        if opslaan:
+            st.session_state["uren_data"][idx] = {
+                "Bedrijf": bedrijf,
+                "Dag": dag,
+                "Datum": datum.strftime("%Y-%m-%d"),
+                "Starttijd": starttijd,
+                "Eindtijd": eindtijd,
+                "Pauze (min)": pauze,
+                "Uren": uren
+            }
+            save_uren()
+            del st.session_state["edit_row"]
+            st.rerun()
+        if annuleren:
+            del st.session_state["edit_row"]
+            st.rerun()
+
+    # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
+    st.subheader("Periode selectie (4 weken per periode)")
+    if st.session_state["eerste_periode_start"] is None:
+        eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
+        if st.button("Zet eerste periode"):
+            save_eerste_periode(eerste_start)
+            st.success("Eerste periode ingesteld!")
+            st.rerun()
+        st.stop()
+    else:
+        eerste_start = st.session_state["eerste_periode_start"]
+        if st.button("Wijzig eerste periode"):
+            nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
+            if st.button("Opslaan nieuwe eerste periode"):
+                st.session_state["eerste_periode_start"] = nieuwe_start
+                save_eerste_periode(nieuwe_start)
+                st.success("Eerste periode aangepast!")
                 st.rerun()
             st.stop()
+        # Bepaal het aantal periodes tot nu toe
+        dagen_geleden = (date.today() - eerste_start).days
+        huidige_periode = 1 + dagen_geleden // 28
+        totaal_periodes = max(1, huidige_periode)
+        # Maak periode-opties met datums
+        periode_opties = []
+        for p in range(1, totaal_periodes+1):
+            p_start = eerste_start + timedelta(days=(p-1)*28)
+            p_eind = p_start + timedelta(days=27)
+            periode_opties.append(f"Periode {p} ({p_start.strftime('%d-%m-%Y')} t/m {p_eind.strftime('%d-%m-%Y')})")
+        periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
+        periode_start = eerste_start + timedelta(days=(periode_idx)*28)
+        periode_eind = periode_start + timedelta(days=27)
+        st.info(f"Periode {periode_idx+1}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
+        # Filter df_periode op deze periode:
+        mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
+        df_periode = df.loc[mask].copy()
+
+    if df_periode.empty:
+        st.info("Geen uren gevonden voor deze periode.")
+        st.stop()
+
+    # Uurtarief ophalen per bedrijf
+    def get_uurtarief(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b["uurtarief"]
+        return 0.0
+
+    df_periode["Uurtarief"] = df_periode["Bedrijf"].apply(get_uurtarief)
+    df_periode["Bedrag"] = df_periode["Uren"] * df_periode["Uurtarief"]
+
+    # Loonheffingspercentage per bedrijf
+    df_periode["Loonheffingspercentage"] = df_periode["Bedrijf"].apply(get_loonheffingspercentage)
+
+    def schatting_per_bedrijf(row):
+        return row["Bedrag"] * (1 - row["Loonheffingspercentage"])
+
+    df_periode["NettoBedrag"] = df_periode.apply(schatting_per_bedrijf, axis=1)
+
+    totaal_uren = df_periode['Uren'].sum()
+    totaal_bedrag = df_periode['Bedrag'].sum()
+    totaal_nettobedrag = df_periode['NettoBedrag'].sum()
+
+    st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
+    st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
+    st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
+
+    # Weekoverzicht met datums achter weeknummer
+    st.subheader("Weekoverzicht")
+    def week_datum_range(weeknr):
+        week_df = df_periode[df_periode['Week'] == weeknr]
+        if week_df.empty:
+            return ""
+        start = week_df['Datum_obj'].min().strftime('%d-%m-%Y')
+        eind = week_df['Datum_obj'].max().strftime('%d-%m-%Y')
+        return f"{start} t/m {eind}"
+
+    weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
+    weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+    weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
+    st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
+
+    # Selecteer week en kopieer uren
+    st.subheader("Kopieer je weekoverzicht")
+    weeknummers = weekoverzicht['Week'].tolist()
+    weeklabels = weekoverzicht['Weeknummer'].tolist()
+    if weeknummers:
+        gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
+        gekozen_week = weeknummers[gekozen_idx]
+        week_df = df_periode[df_periode['Week'] == gekozen_week]
+
+        if not week_df.empty:
+            kopieer_tekst = "\n".join(
+                f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
+                for _, row in week_df.iterrows()
+            )
+            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
+            st.markdown("""
+            <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
+            """, unsafe_allow_html=True)
         else:
-            eerste_start = st.session_state["eerste_periode_start"]
-            if st.button("Wijzig eerste periode"):
-                nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
-                if st.button("Opslaan nieuwe eerste periode"):
-                    st.session_state["eerste_periode_start"] = nieuwe_start
-                    save_eerste_periode(nieuwe_start)
-                    st.success("Eerste periode aangepast!")
-                    st.rerun()
-                st.stop()
-            # Bepaal het aantal periodes tot nu toe
-            dagen_geleden = (date.today() - eerste_start).days
-            huidige_periode = 1 + dagen_geleden // 28
-            totaal_periodes = max(1, huidige_periode)
-            # Maak periode-opties met datums
-            periode_opties = []
-            for p in range(1, totaal_periodes+1):
-                p_start = eerste_start + timedelta(days=(p-1)*28)
-                p_eind = p_start + timedelta(days=27)
-                periode_opties.append(f"Periode {p} ({p_start.strftime('%d-%m-%Y')} t/m {p_eind.strftime('%d-%m-%Y')})")
-            periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
-            periode_start = eerste_start + timedelta(days=(periode_idx)*28)
-            periode_eind = periode_start + timedelta(days=27)
-            st.info(f"Periode {periode_idx+1}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
-            # Filter df_periode op deze periode:
-            mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
-            df_periode = df.loc[mask].copy()
-
-        # Uurtarief ophalen per bedrijf
-        def get_uurtarief(bedrijfsnaam):
-            for b in bedrijven:
-                if b["naam"] == bedrijfsnaam:
-                    return b["uurtarief"]
-            return 0.0
-
-        df_periode["Uurtarief"] = df_periode["Bedrijf"].apply(get_uurtarief)
-        df_periode["Bedrag"] = df_periode["Uren"] * df_periode["Uurtarief"]
-
-        # Loonheffingspercentage per bedrijf
-        df_periode["Loonheffingspercentage"] = df_periode["Bedrijf"].apply(get_loonheffingspercentage)
-
-        def schatting_per_bedrijf(row):
-            return row["Bedrag"] * (1 - row["Loonheffingspercentage"])
-
-        df_periode["NettoBedrag"] = df_periode.apply(schatting_per_bedrijf, axis=1)
-
-        totaal_uren = df_periode['Uren'].sum()
-        totaal_bedrag = df_periode['Bedrag'].sum()
-        totaal_nettobedrag = df_periode['NettoBedrag'].sum()
-
-        st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
-        st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
-        st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
-
-        # Weekoverzicht met datums achter weeknummer
-        st.subheader("Weekoverzicht")
-        def week_datum_range(weeknr):
-            week_df = df_periode[df_periode['Week'] == weeknr]
-            if week_df.empty:
-                return ""
-            start = week_df['Datum_obj'].min().strftime('%d-%m-%Y')
-            eind = week_df['Datum_obj'].max().strftime('%d-%m-%Y')
-            return f"{start} t/m {eind}"
-
-        weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
-        weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
-        weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
-        st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
-
-        # Selecteer week en kopieer uren
-        st.subheader("Kopieer je weekoverzicht")
-        weeknummers = weekoverzicht['Week'].tolist()
-        weeklabels = weekoverzicht['Weeknummer'].tolist()
-        if weeknummers:
-            gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
-            gekozen_week = weeknummers[gekozen_idx]
-            week_df = df_periode[df_periode['Week'] == gekozen_week]
-
-            if not week_df.empty:
-                kopieer_tekst = "\n".join(
-                    f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
-                    for _, row in week_df.iterrows()
-                )
-                st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
-                st.markdown("""
-                <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
-                """, unsafe_allow_html=True)
-            else:
-                st.info("Geen uren gevonden voor deze week.")
-        else:
-            st.info("Geen weekoverzicht beschikbaar.")
-
-        # Download knop
-        excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
-        st.download_button(
-            label="Download als Excel",
-            data=excel_bytes,
-            file_name="urenregistratie.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            st.info("Geen uren gevonden voor deze week.")
     else:
-        st.info("Nog geen uren of bedrijven ingevoerd.")
+        st.info("Geen weekoverzicht beschikbaar.")
+
+    # Download knop
+    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
+    st.download_button(
+        label="Download als Excel",
+        data=excel_bytes,
+        file_name="urenregistratie.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
