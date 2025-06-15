@@ -4,11 +4,68 @@ import re
 from datetime import datetime, date, time, timedelta
 from io import BytesIO
 import os
+import hashlib
 
-UREN_CSV = "uren_data.csv"
-BEDRIJVEN_CSV = "bedrijven.csv"
-PERSOON_CSV = "persoon.csv"
-EERSTE_PERIODE_CSV = "eerste_periode.csv"
+# --- Accountbeheer ---
+USERS_DIR = "users"
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def user_exists(email):
+    return os.path.exists(os.path.join(USERS_DIR, email))
+
+def save_user(email, password):
+    os.makedirs(os.path.join(USERS_DIR, email), exist_ok=True)
+    with open(os.path.join(USERS_DIR, email, "account.txt"), "w") as f:
+        f.write(hash_password(password))
+
+def check_login(email, password):
+    path = os.path.join(USERS_DIR, email, "account.txt")
+    if not os.path.exists(path):
+        return False
+    with open(path) as f:
+        return f.read().strip() == hash_password(password)
+
+# --- Login/Registratie ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+    st.session_state["user_email"] = ""
+
+if not st.session_state["logged_in"]:
+    st.title("Login of registreer")
+    tab1, tab2 = st.tabs(["Inloggen", "Account aanmaken"])
+
+    with tab1:
+        email = st.text_input("E-mail", key="login_email")
+        password = st.text_input("Wachtwoord", type="password", key="login_pw")
+        if st.button("Inloggen"):
+            if user_exists(email) and check_login(email, password):
+                st.session_state["logged_in"] = True
+                st.session_state["user_email"] = email
+                st.rerun()
+            else:
+                st.error("Onjuiste inloggegevens.")
+
+    with tab2:
+        email = st.text_input("E-mail", key="reg_email")
+        password = st.text_input("Wachtwoord", type="password", key="reg_pw")
+        if st.button("Account aanmaken"):
+            if user_exists(email):
+                st.error("Account bestaat al.")
+            else:
+                save_user(email, password)
+                st.success("Account aangemaakt! Je kunt nu inloggen.")
+    st.stop()
+
+# --- Data per gebruiker ---
+def user_file(filename):
+    return os.path.join(USERS_DIR, st.session_state["user_email"], filename)
+
+UREN_CSV = user_file("uren_data.csv")
+BEDRIJVEN_CSV = user_file("bedrijven.csv")
+PERSOON_CSV = user_file("persoon.csv")
+EERSTE_PERIODE_CSV = user_file("eerste_periode.csv")
 
 def load_data():
     if os.path.exists(UREN_CSV):
@@ -63,6 +120,11 @@ pagina = st.sidebar.radio(
     "Ga naar pagina:",
     ("Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens")
 )
+
+if st.sidebar.button("Uitloggen"):
+    st.session_state["logged_in"] = False
+    st.session_state["user_email"] = ""
+    st.rerun()
 
 # Welkom rechtsboven (behalve op Persoonsgegevens)
 if pagina != "Persoonsgegevens":
