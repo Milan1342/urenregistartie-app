@@ -234,7 +234,7 @@ elif pagina == "Bedrijven beheren":
         toevoegen = st.form_submit_button("Toevoegen")
 
         # Toon alvast het percentage als alles is ingevuld
-        if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
+        if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
             bruto_per_dag = bruto / dagen
             netto_per_dag = (netto - reiskosten) / dagen
             st.info(f"Automatisch berekend percentage: {(1 - (netto_per_dag / bruto_per_dag))*100:.2f}%")
@@ -243,7 +243,7 @@ elif pagina == "Bedrijven beheren":
             foutmelding = ""
             if not naam:
                 foutmelding = "Vul een bedrijfsnaam in."
-            elif not (bruto > 0 and netto > 0 and netto <= bruto and dagen > 0):
+            elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
                 foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
             else:
                 bruto_per_dag = bruto / dagen
@@ -304,7 +304,7 @@ elif pagina == "Bedrijven beheren":
                 dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=int(bedrijf.get("loonstrook_dagen", 1)), key=f"dagen_{idx}")
 
                 # Toon percentage als alles is ingevuld
-                if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
+                if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
                     bruto_per_dag = bruto / dagen
                     netto_per_dag = (netto - reiskosten) / dagen
                     loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
@@ -319,7 +319,7 @@ elif pagina == "Bedrijven beheren":
                 foutmelding = ""
                 if not naam:
                     foutmelding = "Vul een bedrijfsnaam in."
-                elif not (bruto > 0 and netto > 0 and netto <= bruto and dagen > 0):
+                elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
                     foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
                 else:
                     bruto_per_dag = bruto / dagen
