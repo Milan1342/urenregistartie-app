@@ -5,6 +5,7 @@ from datetime import datetime, date, time, timedelta
 from io import BytesIO
 import os
 import hashlib
+import shutil
 
 # --- Accountbeheer ---
 USERS_DIR = "users"
@@ -203,8 +204,6 @@ if pagina == "Persoonsgegevens":
     )
     st.info(f"Leeftijd: {leeftijd} jaar")
 
-    import shutil
-
 st.sidebar.markdown("---")
 if st.sidebar.button("Account verwijderen"):
     if st.sidebar.checkbox("Weet je het zeker? Dit kan niet ongedaan worden gemaakt!"):
@@ -356,7 +355,7 @@ elif pagina == "Uren invoeren":
             Ma- 14 apr 12.30/20.30(30) 7.5uur
             Di- 15 apr 12.00/20.30(60) 7.5 uur
             ...
-            Totaal: 15 uur, €180 netto
+            let op de manier waarop dit geschreven is en de spaties
             ```
             """)
             input_text = st.text_area("Plak hier je uren:", height=200)
@@ -442,7 +441,6 @@ elif pagina == "Overzicht":
         if st.session_state["eerste_periode_start"] is None:
             eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
             if st.button("Zet eerste periode"):
-                st.session_state["eerste_periode_start"] = eerste_start
                 save_eerste_periode(eerste_start)
                 st.success("Eerste periode ingesteld!")
                 st.rerun()
@@ -526,12 +524,17 @@ elif pagina == "Overzicht":
             gekozen_week = weeknummers[gekozen_idx]
             week_df = df_periode[df_periode['Week'] == gekozen_week]
 
-            kopieer_tekst = "\n".join(
-                f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
-                for _, row in week_df.iterrows()
-            )
-            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200)
+        kopieer_tekst = "\n".join(
+            f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
+            for _, row in week_df.iterrows()
+        )
+        st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
 
+         # Kopieerknop met JavaScript
+        st.markdown("""
+        <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
+        """, unsafe_allow_html=True)
+        
         # Download knop
         excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
         st.download_button(
