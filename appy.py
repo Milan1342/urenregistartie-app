@@ -536,7 +536,6 @@ elif pagina == "Overzicht":
         periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
         periode_start = eerste_start + timedelta(days=(periode_idx)*28)
         periode_eind = periode_start + timedelta(days=27)
-        st.info(f"Periode {periode_idx+1}: {periode_start.strftime('%d-%m-%Y')} t/m {periode_eind.strftime('%d-%m-%Y')}")
         # Filter df_periode op deze periode:
         mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
         df_periode = df.loc[mask].copy()
