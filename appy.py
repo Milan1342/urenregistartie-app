@@ -206,7 +206,7 @@ if pagina == "Persoonsgegevens":
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
-    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum, actief-status en loonheffingspercentage.")
+    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum, actief-status, loonheffingspercentage en reiskostenvergoeding.")
 
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
@@ -218,8 +218,9 @@ elif pagina == "Bedrijven beheren":
         st.markdown("**Optioneel: vul je loonstrook in voor een nauwkeuriger percentage**")
         bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="bruto_nieuw")
         netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
+        reiskosten = st.number_input("Reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
         if bruto > 0 and netto > 0 and netto <= bruto:
-            loonheffingspercentage = 1 - (netto / bruto)
+            loonheffingspercentage = 1 - ((netto - reiskosten) / bruto)
         else:
             loonheffingspercentage = st.number_input(
                 "Loonheffingspercentage (bijv. 0.0 voor geen belasting, 0.10 voor 10%)",
@@ -235,7 +236,8 @@ elif pagina == "Bedrijven beheren":
                 "loonheffingskorting": loonheffingskorting,
                 "startdatum": startdatum,
                 "actief": actief,
-                "loonheffingspercentage": loonheffingspercentage
+                "loonheffingspercentage": loonheffingspercentage,
+                "reiskosten": reiskosten
             })
             save_bedrijven()
             st.success(f"Bedrijf '{naam}' toegevoegd.")
@@ -259,8 +261,10 @@ elif pagina == "Bedrijven beheren":
                 duur = "Onbekend"
             actief_str = "✅ Actief" if bedrijf.get("actief", True) else "⛔ Gestopt"
             lhp = bedrijf.get("loonheffingspercentage", 0.10)
+            rk = bedrijf.get("reiskosten", 0.0)
             cols[0].markdown(
-                f"**{bedrijf['naam']}**<br>{actief_str}<br>Begonnen op {start} ({duur})<br>Loonheffingspercentage: {lhp*100:.2f}%",
+                f"**{bedrijf['naam']}**<br>{actief_str}<br>Begonnen op {start} ({duur})"
+                f"<br>Loonheffingspercentage: {lhp*100:.2f}%<br>Reiskostenvergoeding: €{rk:.2f}",
                 unsafe_allow_html=True
             )
             if cols[1].button("✏️ Aanpassen", key=f"edit_bedrijf_{idx}"):
@@ -285,8 +289,9 @@ elif pagina == "Bedrijven beheren":
                 st.markdown("**Optioneel: vul je loonstrook in voor een nauwkeuriger percentage**")
                 bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"bruto_{idx}")
                 netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"netto_{idx}")
+                reiskosten = st.number_input("Reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"reiskosten_{idx}")
                 if bruto > 0 and netto > 0 and netto <= bruto:
-                    loonheffingspercentage = 1 - (netto / bruto)
+                    loonheffingspercentage = 1 - ((netto - reiskosten) / bruto)
                 else:
                     loonheffingspercentage = st.number_input(
                         "Loonheffingspercentage (bijv. 0.0 voor geen belasting, 0.10 voor 10%)",
@@ -302,7 +307,8 @@ elif pagina == "Bedrijven beheren":
                     "loonheffingskorting": loonheffingskorting,
                     "startdatum": startdatum,
                     "actief": actief,
-                    "loonheffingspercentage": loonheffingspercentage
+                    "loonheffingspercentage": loonheffingspercentage,
+                    "reiskosten": reiskosten
                 }
                 save_bedrijven()
                 del st.session_state["edit_bedrijf"]
