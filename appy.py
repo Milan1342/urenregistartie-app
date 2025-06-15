@@ -256,7 +256,10 @@ elif pagina == "Bedrijven beheren":
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
         bedrijven_df = pd.DataFrame(st.session_state["bedrijven"])
-        st.table(bedrijven_df[["naam", "uurtarief", "startdatum", "actief", "loonheffingspercentage", "reiskosten", "loonstrook_dagen", "loonstrook_bruto", "loonstrook_netto"]])
+        kolommen = ["naam", "uurtarief", "startdatum", "actief", "loonheffingspercentage", "reiskosten", "loonstrook_dagen", "loonstrook_bruto", "loonstrook_netto"]
+        bestaande_kolommen = [k for k in kolommen if k in bedrijven_df.columns]
+        st.table(bedrijven_df[bestaande_kolommen])
+
 
         # Bewerken van een bedrijf
         if "edit_bedrijf" in st.session_state:
@@ -320,7 +323,6 @@ elif pagina == "Uren invoeren":
                 bedrijf = st.selectbox("Bedrijf", bedrijven_namen)
                 datum = st.date_input("Datum", date.today())
                 dag = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"][datum.weekday()]
-                st.info(f"Dag: {dag}")
                 starttijd = st.time_input("Starttijd", time(9, 0))
                 eindtijd = st.time_input("Eindtijd", time(17, 0))
                 pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
@@ -331,8 +333,6 @@ elif pagina == "Uren invoeren":
                 eind_dt = datetime.combine(date.today(), eindtijd)
                 diff = (eind_dt - start_dt).total_seconds() / 3600  # verschil in uren
                 uren = max(0, diff - pauze / 60)
-
-                st.info(f"Gewerkte uren (excl. pauze): {uren:.2f}")
 
                 if toevoegen:
                     st.session_state["uren_data"].append({
@@ -447,7 +447,6 @@ elif pagina == "Overzicht":
             st.stop()
         else:
             eerste_start = st.session_state["eerste_periode_start"]
-            st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
             if st.button("Wijzig eerste periode"):
                 nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
                 if st.button("Opslaan nieuwe eerste periode"):
@@ -523,6 +522,20 @@ elif pagina == "Overzicht":
             gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
             gekozen_week = weeknummers[gekozen_idx]
             week_df = df_periode[df_periode['Week'] == gekozen_week]
+
+            if not week_df.empty:
+                kopieer_tekst = "\n".join(
+                    f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
+                    for _, row in week_df.iterrows()
+                )
+                st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
+                st.markdown("""
+                <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("Geen uren gevonden voor deze week.")
+        else:
+            st.info("Geen weekoverzicht beschikbaar.")
 
         kopieer_tekst = "\n".join(
             f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
