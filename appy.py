@@ -221,7 +221,7 @@ elif pagina == "Bedrijven beheren":
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
     # --- AANGEPAST BLOK: bedrijven toevoegen ---
-    with st.form("bedrijf_form", clear_on_submit=True):
+    with st.form("bedrijf_form", clear_on_submit=False):
         naam = st.text_input("Bedrijfsnaam")
         uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
         startdatum = st.date_input("Begindatum", value=date.today())
@@ -261,7 +261,7 @@ elif pagina == "Bedrijven beheren":
                 })
                 save_bedrijven()
                 st.success(f"Bedrijf '{naam}' toegevoegd.")
-    # --- EINDE AANGEPAST BLOK ---
+
 
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
