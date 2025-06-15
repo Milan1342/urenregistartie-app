@@ -284,9 +284,12 @@ elif pagina == "Bedrijven beheren":
                 save_bedrijven()
                 st.rerun()
 
-        # Bewerken van een bedrijf
+        # Bewerken van een bedrijf (met index-check en robuuste validatie)
         if "edit_bedrijf" in st.session_state:
             idx = st.session_state["edit_bedrijf"]
+            if idx >= len(st.session_state["bedrijven"]):
+                del st.session_state["edit_bedrijf"]
+                st.rerun()
             bedrijf = st.session_state["bedrijven"][idx]
             st.info("Pas het bedrijf aan en klik op 'Opslaan'")
             with st.form("edit_bedrijf_form"):
@@ -299,29 +302,46 @@ elif pagina == "Bedrijven beheren":
                 netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"netto_{idx}")
                 reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key=f"reiskosten_{idx}")
                 dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=int(bedrijf.get("loonstrook_dagen", 1)), key=f"dagen_{idx}")
-                loonheffingspercentage = None
+
+                # Toon percentage als alles is ingevuld
                 if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
                     bruto_per_dag = bruto / dagen
                     netto_per_dag = (netto - reiskosten) / dagen
                     loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
                     st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
+                else:
+                    loonheffingspercentage = None
+
                 opslaan = st.form_submit_button("Opslaan")
                 annuleren = st.form_submit_button("Annuleren")
-            if opslaan and loonheffingspercentage is not None:
-                st.session_state["bedrijven"][idx] = {
-                    "naam": naam,
-                    "uurtarief": uurtarief,
-                    "startdatum": startdatum,
-                    "actief": actief,
-                    "loonheffingspercentage": loonheffingspercentage,
-                    "reiskosten": reiskosten,
-                    "loonstrook_dagen": dagen,
-                    "loonstrook_bruto": bruto,
-                    "loonstrook_netto": netto
-                }
-                save_bedrijven()
-                del st.session_state["edit_bedrijf"]
-                st.rerun()
+
+            if opslaan:
+                foutmelding = ""
+                if not naam:
+                    foutmelding = "Vul een bedrijfsnaam in."
+                elif not (bruto > 0 and netto > 0 and netto <= bruto and dagen > 0):
+                    foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
+                else:
+                    bruto_per_dag = bruto / dagen
+                    netto_per_dag = (netto - reiskosten) / dagen
+                    loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+                    st.session_state["bedrijven"][idx] = {
+                        "naam": naam,
+                        "uurtarief": uurtarief,
+                        "startdatum": startdatum,
+                        "actief": actief,
+                        "loonheffingspercentage": loonheffingspercentage,
+                        "reiskosten": reiskosten,
+                        "loonstrook_dagen": dagen,
+                        "loonstrook_bruto": bruto,
+                        "loonstrook_netto": netto
+                    }
+                    save_bedrijven()
+                    del st.session_state["edit_bedrijf"]
+                    st.success("Bedrijf aangepast.")
+                    st.rerun()
+                if foutmelding:
+                    st.warning(foutmelding)
             if annuleren:
                 del st.session_state["edit_bedrijf"]
                 st.rerun()
