@@ -220,6 +220,7 @@ elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
+    # --- AANGEPAST BLOK: bedrijven toevoegen ---
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
         uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
@@ -230,28 +231,37 @@ elif pagina == "Bedrijven beheren":
         netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
         reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
         dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=1, key="dagen_nieuw")
+        foutmelding = ""
         loonheffingspercentage = None
         if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
             bruto_per_dag = bruto / dagen
             netto_per_dag = (netto - reiskosten) / dagen
             loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
             st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
+        elif bruto > 0 or netto > 0 or reiskosten > 0:
+            foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
         toevoegen = st.form_submit_button("Toevoegen")
 
-        if toevoegen and naam and loonheffingspercentage is not None:
-            st.session_state["bedrijven"].append({
-                "naam": naam,
-                "uurtarief": uurtarief,
-                "startdatum": startdatum,
-                "actief": actief,
-                "loonheffingspercentage": loonheffingspercentage,
-                "reiskosten": reiskosten,
-                "loonstrook_dagen": dagen,
-                "loonstrook_bruto": bruto,
-                "loonstrook_netto": netto
-            })
-            save_bedrijven()
-            st.success(f"Bedrijf '{naam}' toegevoegd.")
+        if toevoegen:
+            if not naam:
+                st.warning("Vul een bedrijfsnaam in.")
+            elif loonheffingspercentage is None:
+                st.warning(foutmelding or "Vul alle loonstrookvelden correct in.")
+            else:
+                st.session_state["bedrijven"].append({
+                    "naam": naam,
+                    "uurtarief": uurtarief,
+                    "startdatum": startdatum,
+                    "actief": actief,
+                    "loonheffingspercentage": loonheffingspercentage,
+                    "reiskosten": reiskosten,
+                    "loonstrook_dagen": dagen,
+                    "loonstrook_bruto": bruto,
+                    "loonstrook_netto": netto
+                })
+                save_bedrijven()
+                st.success(f"Bedrijf '{naam}' toegevoegd.")
+    # --- EINDE AANGEPAST BLOK ---
 
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
@@ -259,7 +269,6 @@ elif pagina == "Bedrijven beheren":
         kolommen = ["naam", "uurtarief", "startdatum", "actief", "loonheffingspercentage", "reiskosten", "loonstrook_dagen", "loonstrook_bruto", "loonstrook_netto"]
         bestaande_kolommen = [k for k in kolommen if k in bedrijven_df.columns]
         st.table(bedrijven_df[bestaande_kolommen])
-
 
         # Bewerken van een bedrijf
         if "edit_bedrijf" in st.session_state:
@@ -537,17 +546,6 @@ elif pagina == "Overzicht":
         else:
             st.info("Geen weekoverzicht beschikbaar.")
 
-        kopieer_tekst = "\n".join(
-            f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
-            for _, row in week_df.iterrows()
-        )
-        st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
-
-         # Kopieerknop met JavaScript
-        st.markdown("""
-        <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
-        """, unsafe_allow_html=True)
-        
         # Download knop
         excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
         st.download_button(
