@@ -282,6 +282,86 @@ elif pagina == "Bedrijven beheren":
                 st.rerun()
 
         # Bewerken van een bedrijf
+elif pagina == "Bedrijven beheren":
+    st.title("Bedrijven beheren")
+    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum, actief-status en loonstrookgegevens.")
+
+    with st.form("bedrijf_form", clear_on_submit=True):
+        naam = st.text_input("Bedrijfsnaam")
+        uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
+        loonheffing = st.checkbox("Loonheffing aanwezig?", value=True)
+        loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=True)
+        startdatum = st.date_input("Begindatum", value=date.today())
+        actief = st.checkbox("Actief bij dit bedrijf?", value=True)
+        st.markdown("**Optioneel: vul je loonstrook in voor een nauwkeuriger percentage**")
+        bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="bruto_nieuw")
+        netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
+        reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
+        dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=1, key="dagen_nieuw")
+        if bruto > 0 and netto > 0 and netto <= bruto and dagen > 0:
+            bruto_per_dag = bruto / dagen
+            netto_per_dag = (netto - reiskosten) / dagen
+            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+            st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
+        else:
+            loonheffingspercentage = st.number_input(
+                "Loonheffingspercentage (bijv. 0.0 voor geen belasting, 0.10 voor 10%)",
+                min_value=0.0, max_value=0.50, value=0.10, step=0.01, key="lhp_nieuw"
+            )
+        toevoegen = st.form_submit_button("Toevoegen")
+
+        if toevoegen and naam:
+            st.session_state["bedrijven"].append({
+                "naam": naam,
+                "uurtarief": uurtarief,
+                "loonheffing": loonheffing,
+                "loonheffingskorting": loonheffingskorting,
+                "startdatum": startdatum,
+                "actief": actief,
+                "loonheffingspercentage": loonheffingspercentage,
+                "reiskosten": reiskosten,
+                "loonstrook_dagen": dagen,
+                "loonstrook_bruto": bruto,
+                "loonstrook_netto": netto
+            })
+
+            save_bedrijven()
+            st.success(f"Bedrijf '{naam}' toegevoegd.")
+
+    if st.session_state["bedrijven"]:
+        st.subheader("Bestaande bedrijven")
+        bedrijven_df = pd.DataFrame(st.session_state["bedrijven"])
+        st.table(bedrijven_df)
+
+        for idx, bedrijf in enumerate(st.session_state["bedrijven"]):
+            cols = st.columns([3, 1, 1])
+            # Duur berekenen
+            start = bedrijf.get("startdatum")
+            if start:
+                start = pd.to_datetime(start).date()
+                dagen_werk = (date.today() - start).days
+                jaren = dagen_werk // 365
+                maanden = (dagen_werk % 365) // 30
+                duur = f"{jaren} jaar, {maanden} maanden"
+            else:
+                duur = "Onbekend"
+            actief_str = "✅ Actief" if bedrijf.get("actief", True) else "⛔ Gestopt"
+            lhp = bedrijf.get("loonheffingspercentage", 0.10)
+            rk = bedrijf.get("reiskosten", 0.0)
+            cols[0].markdown(
+                f"**{bedrijf['naam']}**<br>{actief_str}<br>Begonnen op {start} ({duur})"
+                f"<br>Loonheffingspercentage: {lhp*100:.2f}%<br>Reiskostenvergoeding (totaal): €{rk:.2f}",
+                unsafe_allow_html=True
+            )
+            if cols[1].button("✏️ Aanpassen", key=f"edit_bedrijf_{idx}"):
+                st.session_state["edit_bedrijf"] = idx
+            if cols[2].button("🗑️ Verwijderen", key=f"del_bedrijf_{idx}"):
+                st.session_state["bedrijven"].pop(idx)
+                save_bedrijven()
+                st.rerun()
+
+                
+        # Bewerken van een bedrijf
         if "edit_bedrijf" in st.session_state:
             idx = st.session_state["edit_bedrijf"]
             bedrijf = st.session_state["bedrijven"][idx]
@@ -333,6 +413,7 @@ elif pagina == "Bedrijven beheren":
     else:
         st.info("Nog geen bedrijven toegevoegd.")
 
+         
 # ------------------ Uren invoeren ------------------
 elif pagina == "Uren invoeren":
     st.title("Uren invoeren")
