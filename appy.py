@@ -220,7 +220,7 @@ elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
-    # --- VERBETERD BLOK: bedrijven toevoegen ---
+    # --- Toevoegen bedrijf ---
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
         uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
@@ -264,14 +264,25 @@ elif pagina == "Bedrijven beheren":
                 st.success(f"Bedrijf '{naam}' toegevoegd.")
             if foutmelding:
                 st.warning(foutmelding)
-    # --- EINDE VERBETERD BLOK ---
 
+    # --- Bestaande bedrijven tonen, bewerken en verwijderen ---
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
         bedrijven_df = pd.DataFrame(st.session_state["bedrijven"])
         kolommen = ["naam", "uurtarief", "startdatum", "actief", "loonheffingspercentage", "reiskosten", "loonstrook_dagen", "loonstrook_bruto", "loonstrook_netto"]
         bestaande_kolommen = [k for k in kolommen if k in bedrijven_df.columns]
-        st.table(bedrijven_df[bestaande_kolommen])
+
+        # Tabel met bewerk/verwijder knoppen
+        for idx, row in bedrijven_df.iterrows():
+            cols = st.columns([2,2,2,2,2,2,2,2,2,1,1])
+            for j, k in enumerate(bestaande_kolommen):
+                cols[j].write(str(row[k]))
+            if cols[-2].button("✏️", key=f"edit_bedrijf_{idx}"):
+                st.session_state["edit_bedrijf"] = idx
+            if cols[-1].button("🗑️", key=f"del_bedrijf_{idx}"):
+                st.session_state["bedrijven"].pop(idx)
+                save_bedrijven()
+                st.rerun()
 
         # Bewerken van een bedrijf
         if "edit_bedrijf" in st.session_state:
