@@ -601,19 +601,3 @@ elif pagina == "Overzicht":
                 for _, row in week_df.iterrows()
             )
             st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
-            st.markdown("""
-            <button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst').value)">Kopieer naar klembord</button>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Geen uren gevonden voor deze week.")
-    else:
-        st.info("Geen weekoverzicht beschikbaar.")
-
-    # Download knop
-    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
-    st.download_button(
-        label="Download als Excel",
-        data=excel_bytes,
-        file_name="urenregistratie.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
