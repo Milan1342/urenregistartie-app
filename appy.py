@@ -5,6 +5,10 @@ from datetime import datetime, date, time, timedelta
 from io import BytesIO
 import os
 import hashlib
+# ...andere imports...
+
+USERS_DIR = "users"
+os.makedirs(USERS_DIR, exist_ok=True)
 
 # --- Accountbeheer ---
 USERS_DIR = "users"
@@ -213,13 +217,15 @@ if pagina == "Persoonsgegevens":
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
-    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing en loonheffingskorting.")
+    st.markdown("Voeg bedrijven toe met uurtarief, loonheffing, loonheffingskorting, begindatum en actief-status.")
 
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
         uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
         loonheffing = st.checkbox("Loonheffing aanwezig?", value=True)
         loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=True)
+        startdatum = st.date_input("Begindatum", value=date.today())
+        actief = st.checkbox("Actief bij dit bedrijf?", value=True)
         toevoegen = st.form_submit_button("Toevoegen")
 
         if toevoegen and naam:
@@ -227,14 +233,68 @@ elif pagina == "Bedrijven beheren":
                 "naam": naam,
                 "uurtarief": uurtarief,
                 "loonheffing": loonheffing,
-                "loonheffingskorting": loonheffingskorting
+                "loonheffingskorting": loonheffingskorting,
+                "startdatum": startdatum,
+                "actief": actief
             })
             save_bedrijven()
             st.success(f"Bedrijf '{naam}' toegevoegd.")
 
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
-        st.table(pd.DataFrame(st.session_state["bedrijven"]))
+        bedrijven_df = pd.DataFrame(st.session_state["bedrijven"])
+        st.table(bedrijven_df)
+
+        for idx, bedrijf in enumerate(st.session_state["bedrijven"]):
+            cols = st.columns([3, 1, 1])
+            # Duur berekenen
+            start = bedrijf.get("startdatum")
+            if start:
+                start = pd.to_datetime(start).date()
+                dagen = (date.today() - start).days
+                jaren = dagen // 365
+                maanden = (dagen % 365) // 30
+                duur = f"{jaren} jaar, {maanden} maanden"
+            else:
+                duur = "Onbekend"
+            actief_str = "✅ Actief" if bedrijf.get("actief", True) else "⛔ Gestopt"
+            cols[0].markdown(f"**{bedrijf['naam']}**<br>{actief_str}<br>Begonnen op {start} ({duur})", unsafe_allow_html=True)
+            if cols[1].button("✏️ Aanpassen", key=f"edit_bedrijf_{idx}"):
+                st.session_state["edit_bedrijf"] = idx
+            if cols[2].button("🗑️ Verwijderen", key=f"del_bedrijf_{idx}"):
+                st.session_state["bedrijven"].pop(idx)
+                save_bedrijven()
+                st.rerun()
+
+        # Bewerken van een bedrijf
+        if "edit_bedrijf" in st.session_state:
+            idx = st.session_state["edit_bedrijf"]
+            bedrijf = st.session_state["bedrijven"][idx]
+            st.info("Pas het bedrijf aan en klik op 'Opslaan'")
+            with st.form("edit_bedrijf_form"):
+                naam = st.text_input("Bedrijfsnaam", value=bedrijf["naam"])
+                uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=float(bedrijf["uurtarief"]), step=0.5)
+                loonheffing = st.checkbox("Loonheffing aanwezig?", value=bedrijf["loonheffing"])
+                loonheffingskorting = st.checkbox("Loonheffingskorting toepassen?", value=bedrijf["loonheffingskorting"])
+                startdatum = st.date_input("Begindatum", value=pd.to_datetime(bedrijf.get("startdatum", date.today())))
+                actief = st.checkbox("Actief bij dit bedrijf?", value=bedrijf.get("actief", True))
+                opslaan = st.form_submit_button("Opslaan")
+                annuleren = st.form_submit_button("Annuleren")
+            if opslaan:
+                st.session_state["bedrijven"][idx] = {
+                    "naam": naam,
+                    "uurtarief": uurtarief,
+                    "loonheffing": loonheffing,
+                    "loonheffingskorting": loonheffingskorting,
+                    "startdatum": startdatum,
+                    "actief": actief
+                }
+                save_bedrijven()
+                del st.session_state["edit_bedrijf"]
+                st.rerun()
+            if annuleren:
+                del st.session_state["edit_bedrijf"]
+                st.rerun()
     else:
         st.info("Nog geen bedrijven toegevoegd.")
 
@@ -245,7 +305,7 @@ elif pagina == "Uren invoeren":
     if not st.session_state["bedrijven"]:
         st.warning("Voeg eerst een bedrijf toe onder 'Bedrijven beheren'.")
     else:
-        bedrijven_namen = [b["naam"] for b in st.session_state["bedrijven"]]
+        bedrijven_namen = [b["naam"] for b in st.session_state["bedrijven"] if b.get("actief", True)]
         invoermethode = st.radio(
             "Kies je invoermethode:",
             ("Handmatig invullen", "Plakken uit notities")
