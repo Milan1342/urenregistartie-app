@@ -203,6 +203,19 @@ if pagina == "Persoonsgegevens":
     )
     st.info(f"Leeftijd: {leeftijd} jaar")
 
+    import shutil
+
+st.sidebar.markdown("---")
+if st.sidebar.button("Account verwijderen"):
+    if st.sidebar.checkbox("Weet je het zeker? Dit kan niet ongedaan worden gemaakt!"):
+        user_dir = os.path.join(USERS_DIR, st.session_state["user_email"])
+        if os.path.exists(user_dir):
+            shutil.rmtree(user_dir)
+        st.session_state["logged_in"] = False
+        st.session_state["user_email"] = ""
+        st.success("Je account is verwijderd.")
+        st.experimental_rerun()
+
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
