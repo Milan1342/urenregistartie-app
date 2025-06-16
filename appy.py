@@ -411,6 +411,13 @@ elif pagina == "Overzicht":
         df = df[df["Bedrijf"] == gekozen_bedrijf]
 
 
+    # --- Jaarinkomsten ---
+    def get_uurtarief(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b["uurtarief"]
+        return 0.0
+
     df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
     df["Bedrag"] = df["Uren"] * df["Uurtarief"]
     df["Loonheffingspercentage"] = df["Bedrijf"].apply(get_loonheffingspercentage)
