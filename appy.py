@@ -410,17 +410,6 @@ elif pagina == "Overzicht":
     if gekozen_bedrijf != "Allemaal":
         df = df[df["Bedrijf"] == gekozen_bedrijf]
 
-    # --- Filter op jaar ---
-    jaren = sorted(df['Jaar'].unique())
-    gekozen_jaar = st.selectbox("Filter op jaar", jaren, index=len(jaren)-1)
-    df = df[df['Jaar'] == gekozen_jaar]
-
-    # --- Jaarinkomsten ---
-    def get_uurtarief(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b["uurtarief"]
-        return 0.0
 
     df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
     df["Bedrag"] = df["Uren"] * df["Uurtarief"]
@@ -574,14 +563,6 @@ elif pagina == "Overzicht":
     else:
         st.info("Geen weekoverzicht beschikbaar.")
 
-    # Download knop
-    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
-    st.download_button(
-        label="Download als Excel",
-        data=excel_bytes,
-        file_name="urenregistratie.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
     # --- Jaaropgave knop ---
     if st.button("Bekijk jaaropgave"):
