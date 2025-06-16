@@ -123,17 +123,20 @@ if "data_loaded" not in st.session_state:
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
 # --- Navigatie met jaaropgave als extra pagina ---
+sidebar_opties = ["Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens"]
+
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Overzicht"
 
-sidebar_opties = ["Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens"]
-if st.session_state.get("pagina", "Overzicht") in sidebar_opties:
-    pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index(st.session_state["pagina"]))
-    st.session_state["pagina"] = pagina
+# Navigatie: radio alleen als je op een hoofd-pagina zit
+if st.session_state.get("pagina") not in sidebar_opties:
+    pagina = st.session_state["pagina"]
 else:
-    # Als je op een 'verborgen' pagina zit (zoals Jaaropgave), toon de radio met default op Overzicht
-    pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index("Overzicht"))
-    st.session_state["pagina"] = pagina
+    gekozen = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index(st.session_state.get("pagina", "Overzicht")))
+    if gekozen != st.session_state.get("pagina"):
+        st.session_state["pagina"] = gekozen
+        st.rerun()
+    pagina = st.session_state["pagina"]
 
 if st.sidebar.button("Uitloggen"):
     st.session_state["logged_in"] = False
@@ -141,7 +144,7 @@ if st.sidebar.button("Uitloggen"):
     st.rerun()
 
 # Welkom rechtsboven (behalve op Persoonsgegevens)
-if st.session_state["pagina"] != "Persoonsgegevens":
+if pagina != "Persoonsgegevens":
     naam = st.session_state["persoon"].get("naam", "Gebruiker")
     st.markdown(
         f"<div style='text-align:right; font-size:1.2em; font-weight:bold;'>Welkom {naam}!</div>",
@@ -160,7 +163,7 @@ def to_excel(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 # ------------------ Persoonsgegevens ------------------
-if st.session_state["pagina"] == "Persoonsgegevens":
+if pagina == "Persoonsgegevens":
     st.title("Persoonsgegevens")
     with st.form("persoon_form"):
         naam = st.text_input("Naam", value=st.session_state["persoon"].get("naam", ""))
@@ -189,10 +192,10 @@ if st.sidebar.button("Account verwijderen"):
         st.session_state["logged_in"] = False
         st.session_state["user_email"] = ""
         st.success("Je account is verwijderd.")
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------ Bedrijven beheren ------------------
-elif st.session_state["pagina"] == "Bedrijven beheren":
+elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
@@ -325,7 +328,7 @@ elif st.session_state["pagina"] == "Bedrijven beheren":
         st.info("Nog geen bedrijven toegevoegd.")
 
 # ------------------ Uren invoeren ------------------
-elif st.session_state["pagina"] == "Uren invoeren":
+elif pagina == "Uren invoeren":
     st.title("Uren invoeren")
 
     if not st.session_state["bedrijven"]:
@@ -361,7 +364,7 @@ elif st.session_state["pagina"] == "Uren invoeren":
                 st.success("Uren toegevoegd!")
 
 # ------------------ Overzicht ------------------
-elif st.session_state["pagina"] == "Overzicht":
+elif pagina == "Overzicht":
     st.title("Overzicht")
 
     data = st.session_state.get("uren_data", [])
@@ -586,7 +589,7 @@ elif st.session_state["pagina"] == "Overzicht":
         st.rerun()
 
 # ------------------ Jaaropgave ------------------
-elif st.session_state["pagina"] == "Jaaropgave":
+elif pagina == "Jaaropgave":
     st.title("Jaaropgave")
     data = st.session_state.get("uren_data", [])
     bedrijven = st.session_state.get("bedrijven", [])
