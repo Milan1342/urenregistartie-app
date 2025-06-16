@@ -559,9 +559,6 @@ elif pagina == "Overzicht":
             )
             key_kopieer = f"kopieer_tekst_{gekozen_week}"
             st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key=key_kopieer)
-            st.markdown(f"""
-            <button onclick="navigator.clipboard.writeText(document.getElementById('{key_kopieer}').value)">Kopieer naar klembord</button>
-            """, unsafe_allow_html=True)
         else:
             st.info("Geen uren gevonden voor deze week.")
     else:
