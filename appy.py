@@ -18,19 +18,12 @@ def user_exists(email):
     return os.path.exists(os.path.join(USERS_DIR, email))
 
 def save_user(email, password):
-    os.makedirs(os.path.join(USERS_DIR, email), exist_ok=True)
-    with open(os.path.join(USERS_DIR, email, "account.txt"), "w") as f:
-        f.write(hash_password(password))
-
-def save_user(email, password):
-    print(f"save_user aangeroepen voor: {email}")
     try:
         user_dir = os.path.join(USERS_DIR, email)
         os.makedirs(user_dir, exist_ok=True)
         file_path = os.path.join(user_dir, "account.txt")
         with open(file_path, "w") as f:
             f.write(hash_password(password))
-        print(f"account.txt succesvol aangemaakt op: {file_path}")
     except Exception as e:
         print(f"Fout bij aanmaken account.txt: {e}")
 
@@ -158,42 +151,6 @@ def to_excel(df: pd.DataFrame) -> bytes:
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False)
     return output.getvalue()
-
-def weeknummer(datum: str) -> int:
-    return datetime.strptime(datum, "%Y-%m-%d").isocalendar()[1]
-
-pattern = re.compile(
-    r"(?P<dag>\w{2})-\s*(?P<datum>\d{1,2}\s\w{3}(?:\s\d{4})?)\s+"
-    r"(?P<start>\d{1,2}[.:]\d{2})\s*/\s*(?P<eind>\d{1,2}[.:]\d{2})\s*"
-    r"\(\s*(?P<pauze>\d+)\s*\)\s+(?P<uren>[\d.,]+)\s*uur",
-    re.IGNORECASE
-)
-
-def parse_row(row: str, default_year: int, bedrijf: str) -> dict | None:
-    match = pattern.match(row.strip())
-    if match:
-        items = match.groupdict()
-        start_time = items['start'].replace('.', ':')
-        end_time = items['eind'].replace('.', ':')
-        # Voeg jaar toe als niet aanwezig
-        if len(items['datum'].split()) == 2:
-            datum_str = f"{items['datum']} {default_year}"
-        else:
-            datum_str = items['datum']
-        try:
-            datum_obj = datetime.strptime(datum_str, "%d %b %Y")
-        except ValueError:
-            return None
-        return {
-            "Bedrijf": bedrijf,
-            "Dag": items['dag'].capitalize(),
-            "Datum": datum_obj.strftime("%Y-%m-%d"),
-            "Starttijd": start_time,
-            "Eindtijd": end_time,
-            "Pauze (min)": int(items['pauze']),
-            "Uren": float(items['uren'].replace(',', '.'))
-        }
-    return None
 
 # ------------------ Persoonsgegevens ------------------
 if pagina == "Persoonsgegevens":
@@ -368,65 +325,33 @@ elif pagina == "Uren invoeren":
         st.warning("Voeg eerst een bedrijf toe onder 'Bedrijven beheren'.")
     else:
         bedrijven_namen = [b["naam"] for b in st.session_state["bedrijven"] if b.get("actief", True)]
-        invoermethode = st.radio(
-            "Kies je invoermethode:",
-            ("Handmatig invullen", "Plakken uit notities")
-        )
+        with st.form("uren_formulier", clear_on_submit=True):
+            bedrijf = st.selectbox("Bedrijf", bedrijven_namen)
+            datum = st.date_input("Datum", date.today())
+            dag = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"][datum.weekday()]
+            starttijd = st.time_input("Starttijd", time(9, 0))
+            eindtijd = st.time_input("Eindtijd", time(17, 0))
+            pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
+            toevoegen = st.form_submit_button("Toevoegen")
 
-        if invoermethode == "Handmatig invullen":
-            with st.form("uren_formulier", clear_on_submit=True):
-                bedrijf = st.selectbox("Bedrijf", bedrijven_namen)
-                datum = st.date_input("Datum", date.today())
-                dag = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"][datum.weekday()]
-                starttijd = st.time_input("Starttijd", time(9, 0))
-                eindtijd = st.time_input("Eindtijd", time(17, 0))
-                pauze = st.number_input("Pauze (minuten)", min_value=0, max_value=180, value=30)
-                toevoegen = st.form_submit_button("Toevoegen")
+            # Automatische berekening gewerkte uren
+            start_dt = datetime.combine(date.today(), starttijd)
+            eind_dt = datetime.combine(date.today(), eindtijd)
+            diff = (eind_dt - start_dt).total_seconds() / 3600  # verschil in uren
+            uren = max(0, diff - pauze / 60)
 
-                # Automatische berekening gewerkte uren
-                start_dt = datetime.combine(date.today(), starttijd)
-                eind_dt = datetime.combine(date.today(), eindtijd)
-                diff = (eind_dt - start_dt).total_seconds() / 3600  # verschil in uren
-                uren = max(0, diff - pauze / 60)
-
-                if toevoegen:
-                    st.session_state["uren_data"].append({
-                        "Bedrijf": bedrijf,
-                        "Dag": dag,
-                        "Datum": datum.strftime("%Y-%m-%d"),
-                        "Starttijd": starttijd.strftime("%H:%M"),
-                        "Eindtijd": eindtijd.strftime("%H:%M"),
-                        "Pauze (min)": pauze,
-                        "Uren": uren
-                    })
-                    save_uren()
-
-        elif invoermethode == "Plakken uit notities":
-            bedrijf = st.selectbox("Bedrijf", bedrijven_namen, key="bedrijf_plak")
-            st.markdown("""
-            Plak hieronder je notities, bijvoorbeeld:
-
-            ```
-            Ma- 14 apr 12.30/20.30(30) 7.5uur
-            Di- 15 apr 12.00/20.30(60) 7.5 uur
-            ...
-            let op de manier waarop dit geschreven is en de spaties
-            ```
-            """)
-            input_text = st.text_area("Plak hier je uren:", height=200)
-            fouten = []
-            if st.button("Toevoegen uit tekst"):
-                rows = input_text.strip().split('\n')
-                default_year = datetime.now().year
-                for i, row in enumerate(rows, 1):
-                    parsed = parse_row(row, default_year, bedrijf)
-                    if parsed:
-                        st.session_state["uren_data"].append(parsed)
-                    elif row.strip() and not row.lower().startswith("totaal"):
-                        fouten.append(f"Regel {i} niet herkend: {row}")
-                if fouten:
-                    st.warning("Sommige regels konden niet worden verwerkt:\n" + "\n".join(fouten))
+            if toevoegen:
+                st.session_state["uren_data"].append({
+                    "Bedrijf": bedrijf,
+                    "Dag": dag,
+                    "Datum": datum.strftime("%Y-%m-%d"),
+                    "Starttijd": starttijd.strftime("%H:%M"),
+                    "Eindtijd": eindtijd.strftime("%H:%M"),
+                    "Pauze (min)": pauze,
+                    "Uren": uren
+                })
                 save_uren()
+                st.success("Uren toegevoegd!")
 
 # ------------------ Overzicht ------------------
 elif pagina == "Overzicht":
@@ -460,13 +385,45 @@ elif pagina == "Overzicht":
             st.error(f"Kolom '{kol}' ontbreekt in de data. Controleer je CSV-bestanden.")
             st.stop()
 
-    # Datum parsing en weeknummer
+    # Datum parsing en extra kolommen
     df['Datum_obj'] = pd.to_datetime(df['Datum'], errors='coerce')
     df = df.dropna(subset=['Datum_obj'])
     if df.empty:
         st.warning("Geen geldige datums gevonden in je uren. Controleer je invoer.")
         st.stop()
     df['Week'] = df['Datum_obj'].dt.isocalendar().week
+    df['Jaar'] = df['Datum_obj'].dt.year
+
+    # --- Filter op bedrijf ---
+    bedrijven_namen = ["Allemaal"] + [b["naam"] for b in bedrijven]
+    gekozen_bedrijf = st.selectbox("Filter op bedrijf", bedrijven_namen)
+    if gekozen_bedrijf != "Allemaal":
+        df = df[df["Bedrijf"] == gekozen_bedrijf]
+
+    # --- Filter op jaar ---
+    jaren = sorted(df['Jaar'].unique())
+    gekozen_jaar = st.selectbox("Filter op jaar", jaren, index=len(jaren)-1)
+    df = df[df['Jaar'] == gekozen_jaar]
+
+    # --- Jaarinkomsten ---
+    def get_uurtarief(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b["uurtarief"]
+        return 0.0
+
+    df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
+    df["Bedrag"] = df["Uren"] * df["Uurtarief"]
+    df["Loonheffingspercentage"] = df["Bedrijf"].apply(get_loonheffingspercentage)
+    df["NettoBedrag"] = df.apply(lambda row: row["Bedrag"] * (1 - row["Loonheffingspercentage"]), axis=1)
+
+    jaar_bruto = df["Bedrag"].sum()
+    jaar_netto = df["NettoBedrag"].sum()
+    jaar_uren = df["Uren"].sum()
+
+    st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
+    st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
+    st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
 
     # Toevoegen: Uren aanpassen/verwijderen
     st.subheader("Uren aanpassen of verwijderen")
@@ -555,23 +512,10 @@ elif pagina == "Overzicht":
         st.info("Geen uren gevonden voor deze periode.")
         st.stop()
 
-    # Uurtarief ophalen per bedrijf
-    def get_uurtarief(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b["uurtarief"]
-        return 0.0
-
     df_periode["Uurtarief"] = df_periode["Bedrijf"].apply(get_uurtarief)
     df_periode["Bedrag"] = df_periode["Uren"] * df_periode["Uurtarief"]
-
-    # Loonheffingspercentage per bedrijf
     df_periode["Loonheffingspercentage"] = df_periode["Bedrijf"].apply(get_loonheffingspercentage)
-
-    def schatting_per_bedrijf(row):
-        return row["Bedrag"] * (1 - row["Loonheffingspercentage"])
-
-    df_periode["NettoBedrag"] = df_periode.apply(schatting_per_bedrijf, axis=1)
+    df_periode["NettoBedrag"] = df_periode.apply(lambda row: row["Bedrag"] * (1 - row["Loonheffingspercentage"]), axis=1)
 
     totaal_uren = df_periode['Uren'].sum()
     totaal_bedrag = df_periode['Bedrag'].sum()
@@ -610,6 +554,21 @@ elif pagina == "Overzicht":
                 f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
                 for _, row in week_df.iterrows()
             )
-            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
+            key_kopieer = f"kopieer_tekst_{gekozen_week}"
+            st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key=key_kopieer)
+            st.markdown(f"""
+            <button onclick="navigator.clipboard.writeText(document.getElementById('{key_kopieer}').value)">Kopieer naar klembord</button>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("Geen uren gevonden voor deze week.")
+    else:
+        st.info("Geen weekoverzicht beschikbaar.")
 
-            
+    # Download knop
+    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
+    st.download_button(
+        label="Download als Excel",
+        data=excel_bytes,
+        file_name="urenregistratie.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
