@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 from datetime import datetime, date, time, timedelta
 from io import BytesIO
 import os
@@ -123,10 +122,13 @@ if "data_loaded" not in st.session_state:
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
-pagina = st.sidebar.radio(
-    "Ga naar pagina:",
-    ("Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens")
-)
+# --- Navigatie met jaaropgave als extra pagina ---
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "Overzicht"
+
+sidebar_opties = ["Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens"]
+pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index(st.session_state["pagina"]))
+st.session_state["pagina"] = pagina
 
 if st.sidebar.button("Uitloggen"):
     st.session_state["logged_in"] = False
@@ -134,7 +136,7 @@ if st.sidebar.button("Uitloggen"):
     st.rerun()
 
 # Welkom rechtsboven (behalve op Persoonsgegevens)
-if pagina != "Persoonsgegevens":
+if st.session_state["pagina"] != "Persoonsgegevens":
     naam = st.session_state["persoon"].get("naam", "Gebruiker")
     st.markdown(
         f"<div style='text-align:right; font-size:1.2em; font-weight:bold;'>Welkom {naam}!</div>",
@@ -153,7 +155,7 @@ def to_excel(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 # ------------------ Persoonsgegevens ------------------
-if pagina == "Persoonsgegevens":
+if st.session_state["pagina"] == "Persoonsgegevens":
     st.title("Persoonsgegevens")
     with st.form("persoon_form"):
         naam = st.text_input("Naam", value=st.session_state["persoon"].get("naam", ""))
@@ -185,7 +187,7 @@ if st.sidebar.button("Account verwijderen"):
         st.experimental_rerun()
 
 # ------------------ Bedrijven beheren ------------------
-elif pagina == "Bedrijven beheren":
+elif st.session_state["pagina"] == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
@@ -318,7 +320,7 @@ elif pagina == "Bedrijven beheren":
         st.info("Nog geen bedrijven toegevoegd.")
 
 # ------------------ Uren invoeren ------------------
-elif pagina == "Uren invoeren":
+elif st.session_state["pagina"] == "Uren invoeren":
     st.title("Uren invoeren")
 
     if not st.session_state["bedrijven"]:
@@ -354,7 +356,7 @@ elif pagina == "Uren invoeren":
                 st.success("Uren toegevoegd!")
 
 # ------------------ Overzicht ------------------
-elif pagina == "Overzicht":
+elif st.session_state["pagina"] == "Overzicht":
     st.title("Overzicht")
 
     data = st.session_state.get("uren_data", [])
@@ -572,3 +574,61 @@ elif pagina == "Overzicht":
         file_name="urenregistratie.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # --- Jaaropgave knop ---
+    if st.button("Bekijk jaaropgave"):
+        st.session_state["pagina"] = "Jaaropgave"
+        st.experimental_rerun()
+
+# ------------------ Jaaropgave ------------------
+elif st.session_state["pagina"] == "Jaaropgave":
+    st.title("Jaaropgave")
+    data = st.session_state.get("uren_data", [])
+    bedrijven = st.session_state.get("bedrijven", [])
+    if not bedrijven or not data:
+        st.warning("Er zijn nog geen bedrijven of uren ingevoerd.")
+        st.stop()
+    df = pd.DataFrame(data)
+    df['Datum_obj'] = pd.to_datetime(df['Datum'], errors='coerce')
+    df = df.dropna(subset=['Datum_obj'])
+    df['Jaar'] = df['Datum_obj'].dt.year
+
+    bedrijven_namen = ["Allemaal"] + [b["naam"] for b in bedrijven]
+    gekozen_bedrijf = st.selectbox("Bedrijf", bedrijven_namen)
+    jaren = sorted(df['Jaar'].unique())
+    gekozen_jaar = st.selectbox("Jaar", jaren, index=len(jaren)-1)
+
+    df = df[df['Jaar'] == gekozen_jaar]
+    if gekozen_bedrijf != "Allemaal":
+        df = df[df["Bedrijf"] == gekozen_bedrijf]
+
+    # Uurtarief en loonheffing ophalen
+    def get_loonheffingspercentage(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b.get("loonheffingspercentage", 0.10)
+        return 0.10
+    def get_uurtarief(bedrijfsnaam):
+        for b in bedrijven:
+            if b["naam"] == bedrijfsnaam:
+                return b["uurtarief"]
+        return 0.0
+
+    df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
+    df["Bedrag"] = df["Uren"] * df["Uurtarief"]
+    df["Loonheffingspercentage"] = df["Bedrijf"].apply(get_loonheffingspercentage)
+    df["NettoBedrag"] = df.apply(lambda row: row["Bedrag"] * (1 - row["Loonheffingspercentage"]), axis=1)
+
+    jaar_bruto = df["Bedrag"].sum()
+    jaar_netto = df["NettoBedrag"].sum()
+    jaar_uren = df["Uren"].sum()
+
+    st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
+    st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
+    st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
+
+    st.dataframe(df[["Datum", "Bedrijf", "Uren", "Uurtarief", "Bedrag", "NettoBedrag"]])
+
+    if st.button("Terug naar overzicht"):
+        st.session_state["pagina"] = "Overzicht"
+        st.experimental_rerun()
