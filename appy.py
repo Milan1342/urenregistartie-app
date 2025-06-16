@@ -127,8 +127,13 @@ if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Overzicht"
 
 sidebar_opties = ["Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens"]
-pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index(st.session_state["pagina"]))
-st.session_state["pagina"] = pagina
+if st.session_state.get("pagina", "Overzicht") in sidebar_opties:
+    pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index(st.session_state["pagina"]))
+    st.session_state["pagina"] = pagina
+else:
+    # Als je op een 'verborgen' pagina zit (zoals Jaaropgave), toon de radio met default op Overzicht
+    pagina = st.sidebar.radio("Ga naar pagina:", sidebar_opties, index=sidebar_opties.index("Overzicht"))
+    st.session_state["pagina"] = pagina
 
 if st.sidebar.button("Uitloggen"):
     st.session_state["logged_in"] = False
