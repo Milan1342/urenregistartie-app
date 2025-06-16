@@ -612,19 +612,4 @@ elif pagina == "Overzicht":
             )
             st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key="kopieer_tekst")
 
-            # ...bestaande code...
-
-kopieer_tekst = "\n".join(
-    f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
-    for _, row in week_df.iterrows()
-)
-
-st.text_area(
-    "Kopieer deze tekst en stuur door:",
-    kopieer_tekst,
-    height=200,
-    key=f"kopieer_tekst_{gekozen_week}"
-)
-st.markdown(f"""
-<button onclick="navigator.clipboard.writeText(document.getElementById('kopieer_tekst_{gekozen_week}').value)">Kopieer naar klembord</button>
-""", unsafe_allow_html=True)
+            
