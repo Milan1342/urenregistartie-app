@@ -22,6 +22,18 @@ def save_user(email, password):
     with open(os.path.join(USERS_DIR, email, "account.txt"), "w") as f:
         f.write(hash_password(password))
 
+def save_user(email, password):
+    print(f"save_user aangeroepen voor: {email}")
+    try:
+        user_dir = os.path.join(USERS_DIR, email)
+        os.makedirs(user_dir, exist_ok=True)
+        file_path = os.path.join(user_dir, "account.txt")
+        with open(file_path, "w") as f:
+            f.write(hash_password(password))
+        print(f"account.txt succesvol aangemaakt op: {file_path}")
+    except Exception as e:
+        print(f"Fout bij aanmaken account.txt: {e}")
+
 def check_login(email, password):
     path = os.path.join(USERS_DIR, email, "account.txt")
     if not os.path.exists(path):
