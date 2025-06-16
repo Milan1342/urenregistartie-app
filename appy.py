@@ -533,7 +533,6 @@ elif pagina == "Overzicht":
                 st.session_state["eerste_periode_start"] = nieuwe_start
                 save_eerste_periode(nieuwe_start)
                 st.success("Eerste periode aangepast!")
-                st.rerun()
             st.stop()
         # Bepaal het aantal periodes tot nu toe
         dagen_geleden = (date.today() - eerste_start).days
