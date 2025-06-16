@@ -631,4 +631,4 @@ elif st.session_state["pagina"] == "Jaaropgave":
 
     if st.button("Terug naar overzicht"):
         st.session_state["pagina"] = "Overzicht"
-        st.experimental_rerun()
+        st.rerun()
