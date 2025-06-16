@@ -578,7 +578,7 @@ elif st.session_state["pagina"] == "Overzicht":
     # --- Jaaropgave knop ---
     if st.button("Bekijk jaaropgave"):
         st.session_state["pagina"] = "Jaaropgave"
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------ Jaaropgave ------------------
 elif st.session_state["pagina"] == "Jaaropgave":
