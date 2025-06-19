@@ -214,53 +214,7 @@ elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
-    # --- Toevoegen bedrijf ---
-    with st.form("bedrijf_form", clear_on_submit=True):
-        naam = st.text_input("Bedrijfsnaam")
-        uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
-        startdatum = st.date_input("Begindatum", value=date.today())
-        actief = st.checkbox("Actief bij dit bedrijf?", value=True)
-        st.markdown("**Vul je loonstrook in voor het juiste percentage**")
-        bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="bruto_nieuw")
-        netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
-        reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
-        dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=1, key="dagen_nieuw")
-        toevoegen = st.form_submit_button("Toevoegen")
-
-        # Toon alvast het percentage als alles is ingevuld
-        if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
-            bruto_per_dag = (bruto + reiskosten) / dagen
-            netto_per_dag = netto / dagen
-            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
-            st.info(f"Automatisch berekend percentage: {loonheffingspercentage * 100:.2f} %")
-
-        if toevoegen:
-            foutmelding = ""
-            if not naam:
-                foutmelding = "Vul een bedrijfsnaam in."
-            elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
-                foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
-            else:
-                bruto_per_dag = (bruto + reiskosten) / dagen
-                netto_per_dag = netto / dagen
-                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
-                st.session_state["bedrijven"].append({
-                    "naam": naam,
-                    "uurtarief": uurtarief,
-                    "startdatum": startdatum,
-                    "actief": actief,
-                    "loonheffingspercentage": loonheffingspercentage,
-                    "reiskosten": reiskosten,
-                    "loonstrook_dagen": dagen,
-                    "loonstrook_bruto": bruto,
-                    "loonstrook_netto": netto
-                })
-                save_bedrijven()
-                st.success(f"Bedrijf '{naam}' toegevoegd.")
-            if foutmelding:
-                st.warning(foutmelding)
-
-    # --- Bestaande bedrijven tonen, bewerken en verwijderen ---
+     # --- Bestaande bedrijven tonen, bewerken en verwijderen ---
     if st.session_state["bedrijven"]:
         st.subheader("Bestaande bedrijven")
         bedrijven_df = pd.DataFrame(st.session_state["bedrijven"])
@@ -343,6 +297,53 @@ elif pagina == "Bedrijven beheren":
     else:
         st.info("Nog geen bedrijven toegevoegd.")
 
+    # --- Toevoegen bedrijf ---
+    with st.form("bedrijf_form", clear_on_submit=True):
+        naam = st.text_input("Bedrijfsnaam")
+        uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
+        startdatum = st.date_input("Begindatum", value=date.today())
+        actief = st.checkbox("Actief bij dit bedrijf?", value=True)
+        st.markdown("**Vul je loonstrook in voor het juiste percentage**")
+        bruto = st.number_input("Bruto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="bruto_nieuw")
+        netto = st.number_input("Netto loon volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="netto_nieuw")
+        reiskosten = st.number_input("Totale reiskostenvergoeding volgens loonstrook (€)", min_value=0.0, step=0.01, format="%.2f", key="reiskosten_nieuw")
+        dagen = st.number_input("Aantal dagen op loonstrook", min_value=1, step=1, value=1, key="dagen_nieuw")
+        toevoegen = st.form_submit_button("Toevoegen")
+
+        # Toon alvast het percentage als alles is ingevuld
+        if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
+            bruto_per_dag = (bruto + reiskosten) / dagen
+            netto_per_dag = netto / dagen
+            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+            st.info(f"Automatisch berekend percentage: {loonheffingspercentage * 100:.2f} %")
+
+        if toevoegen:
+            foutmelding = ""
+            if not naam:
+                foutmelding = "Vul een bedrijfsnaam in."
+            elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
+                foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
+            else:
+                bruto_per_dag = (bruto + reiskosten) / dagen
+                netto_per_dag = netto / dagen
+                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+                st.session_state["bedrijven"].append({
+                    "naam": naam,
+                    "uurtarief": uurtarief,
+                    "startdatum": startdatum,
+                    "actief": actief,
+                    "loonheffingspercentage": loonheffingspercentage,
+                    "reiskosten": reiskosten,
+                    "loonstrook_dagen": dagen,
+                    "loonstrook_bruto": bruto,
+                    "loonstrook_netto": netto
+                })
+                save_bedrijven()
+                st.success(f"Bedrijf '{naam}' toegevoegd.")
+            if foutmelding:
+                st.warning(foutmelding)
+
+   
 # ------------------ Uren invoeren ------------------
 elif pagina == "Uren invoeren":
     st.title("Uren invoeren")
