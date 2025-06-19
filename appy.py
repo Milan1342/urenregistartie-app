@@ -496,20 +496,6 @@ if df_periode.empty:
 # Weekoverzicht met datums achter weeknummer
 st.subheader("Weekoverzicht")
 
-def week_datum_range(weeknr):
-    week_df = df_periode[df_periode['Week'] == weeknr]
-    if week_df.empty:
-        return ""
-    start = week_df['Datum_obj'].min()
-    end = week_df['Datum_obj'].max()
-    if not isinstance(start, pd.Timestamp) or not isinstance(end, pd.Timestamp):
-        return ""
-    if pd.isna(start) or pd.isna(end):
-        return ""
-    return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
-
-# Weekoverzicht met datums achter weeknummer
-# Boven dit stuk
 weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
 
 # Plak hier de functie:
