@@ -471,6 +471,7 @@ elif pagina == "Overzicht":
         dagen_geleden = (date.today() - eerste_start).days
         huidige_periode = 1 + dagen_geleden // 28
         totaal_periodes = max(1, huidige_periode)
+        
         # Maak periode-opties met datums
         periode_opties = []
         for p in range(1, totaal_periodes+1):
@@ -480,6 +481,7 @@ elif pagina == "Overzicht":
         periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
         periode_start = eerste_start + timedelta(days=(periode_idx)*28)
         periode_eind = periode_start + timedelta(days=27)
+        
         # Filter df_periode op deze periode:
         mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
         df_periode = df.loc[mask].copy()
@@ -502,13 +504,16 @@ elif pagina == "Overzicht":
 
     # Weekoverzicht met datums achter weeknummer
     st.subheader("Weekoverzicht")
+
     def week_datum_range(weeknr):
         week_df = df_periode[df_periode['Week'] == weeknr]
         if week_df.empty:
             return ""
-        start = week_df['Datum_obj'].min().strftime('%d-%m-%Y')
-        eind = week_df['Datum_obj'].max().strftime('%d-%m-%Y')
-        return f"{start} t/m {eind}"
+        start = week_df['Datum_obj'].min()
+        eind = week_df['Datum_obj'].max()
+        if pd.isnull(start) or pd.isnull(eind):
+            return ""
+        return f"{start.strftime('%d-%m-%Y')} t/m {eind.strftime('%d-%m-%Y')}"
 
     weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
     weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
