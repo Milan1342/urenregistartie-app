@@ -432,6 +432,11 @@ elif pagina == "Overzicht":
     st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
     st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
     st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
+    
+        # --- Jaaropgave knop ---
+    if st.button("Bekijk jaaropgave"):
+        st.session_state["pagina"] = "Jaaropgave"
+        st.rerun()
 
     # --- Knop naar uren aanpassen pagina ---
     if st.button("Bekijk en bewerk alle uren"):
@@ -526,19 +531,6 @@ elif pagina == "Overzicht":
     else:
         st.info("Geen weekoverzicht beschikbaar.")
 
-    # Download knop
-    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
-    st.download_button(
-        label="Download als Excel",
-        data=excel_bytes,
-        file_name="urenregistratie.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    # --- Jaaropgave knop ---
-    if st.button("Bekijk jaaropgave"):
-        st.session_state["pagina"] = "Jaaropgave"
-        st.rerun()
 
 # ------------------ Uren aanpassen ------------------
 elif pagina == "Uren aanpassen":
