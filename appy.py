@@ -516,6 +516,10 @@ weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
 
 weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
 weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
+
+weekoverzicht["NettoBedrag"] = weekoverzicht["NettoBedrag"].round(2)
+weekoverzicht["Bedrag"] = weekoverzicht["Bedrag"].round(2)
+
 st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
 
 # Selecteer week en kopieer uren
