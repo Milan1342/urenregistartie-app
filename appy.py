@@ -509,6 +509,10 @@ def week_datum_range(weeknr):
     return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
 
 # Weekoverzicht met datums achter weeknummer
+# Boven dit stuk
+weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
+
+# Plak hier de functie:
 def week_datum_range(weeknr):
     week_df = df_periode[df_periode['Week'] == weeknr]
     if week_df.empty:
@@ -521,7 +525,9 @@ def week_datum_range(weeknr):
         return ""
     return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
 
-weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
+weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+
+
 weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
 weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
 st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
