@@ -536,7 +536,7 @@ else:
     st.info("Geen weekoverzicht beschikbaar.")
 
 # ------------------ Uren aanpassen ------------------
-elif pagina == "Uren aanpassen":
+if pagina == "Uren aanpassen":
     st.title("Uren aanpassen en verwijderen")
     data = st.session_state.get("uren_data", [])
     if not data:
