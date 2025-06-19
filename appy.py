@@ -496,15 +496,15 @@ elif pagina == "Overzicht":
     # Weekoverzicht met datums achter weeknummer
     st.subheader("Weekoverzicht")
 
-    def week_datum_range(weeknr):
-        week_df = df_periode[df_periode['Week'] == weeknr]
-        if week_df.empty:
-            return ""
-        start = week_df['Datum_obj'].min()
-        eind = week_df['Datum_obj'].max()
-        if pd.isnull(start) or pd.isnull(eind):
-            return ""
-        return f"{start.strftime('%d-%m-%Y')} t/m {eind.strftime('%d-%m-%Y')}"
+def week_datum_range(weeknr):
+    week_df = df_periode[df_periode['Week'] == weeknr]
+    if week_df.empty:
+        return ""
+    start = week_df['Datum_obj'].min()
+    eind = week_df['Datum_obj'].max()
+    if start is None or eind is None or pd.isnull(start) or pd.isnull(eind):
+        return ""
+    return f"{start.strftime('%d-%m-%Y')} t/m {eind.strftime('%d-%m-%Y')}"
 
     weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
     weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
