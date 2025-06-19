@@ -229,9 +229,10 @@ elif pagina == "Bedrijven beheren":
 
         # Toon alvast het percentage als alles is ingevuld
         if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
-            bruto_per_dag = bruto / dagen
-            netto_per_dag = (netto - reiskosten) / dagen
-            st.info(f"Automatisch berekend percentage: {(1 - (netto_per_dag / bruto_per_dag))*100:.2f}%")
+            bruto_per_dag = bruto + reiskosten
+            netto_per_dag = netto 
+            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag) * 100
+            st.info(f"Automatisch berekend percentage: "+ loonheffingspercentage + " %")
 
         if toevoegen:
             foutmelding = ""
@@ -240,10 +241,9 @@ elif pagina == "Bedrijven beheren":
             elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
                 foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
             else:
-                bruto_per_dag = bruto / dagen
-                netto_per_dag = (netto - reiskosten) / dagen
-                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
-                st.session_state["bedrijven"].append({
+                bruto_per_dag = bruto + reiskosten
+                netto_per_dag = netto
+                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag) * 100                st.session_state["bedrijven"].append({
                     "naam": naam,
                     "uurtarief": uurtarief,
                     "startdatum": startdatum,
@@ -432,7 +432,7 @@ elif pagina == "Overzicht":
     st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
     st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
     st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
-    
+
         # --- Jaaropgave knop ---
     if st.button("Bekijk jaaropgave"):
         st.session_state["pagina"] = "Jaaropgave"
