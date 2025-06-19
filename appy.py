@@ -501,12 +501,12 @@ def week_datum_range(weeknr):
     if week_df.empty:
         return ""
     start = week_df['Datum_obj'].min()
-    eind = week_df['Datum_obj'].max()
-    if not isinstance(start, pd.Timestamp) or not isinstance(eind, pd.Timestamp):
+    end = week_df['Datum_obj'].max()
+    if not isinstance(start, pd.Timestamp) or not isinstance(end, pd.Timestamp):
         return ""
-    if pd.isna(start) or pd.isna(eind):
+    if pd.isna(start) or pd.isna(end):
         return ""
-    return f"{start.strftime('%d-%m-%Y')} t/m {eind.strftime('%d-%m-%Y')}"
+    return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
 
 # Weekoverzicht met datums achter weeknummer
 weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
