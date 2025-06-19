@@ -298,7 +298,7 @@ elif pagina == "Bedrijven beheren":
         st.info("Nog geen bedrijven toegevoegd.")
 
     # --- Toevoegen bedrijf ---
-        st.title("Bedrijven Aanmaken")
+    st.title("Bedrijven Aanmaken")
     st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
 
     with st.form("bedrijf_form", clear_on_submit=True):
