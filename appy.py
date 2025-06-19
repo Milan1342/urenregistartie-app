@@ -440,70 +440,71 @@ elif pagina == "Overzicht":
         st.session_state["pagina"] = "Uren aanpassen"
         st.rerun()
 
-    # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
-    st.subheader("Periode selectie (4 weken per periode)")
+# Periodebeheer: 4-weken periodes met opslag en datums in selectbox
+st.subheader("Periode selectie (4 weken per periode)")
 
-    eerste_start = st.session_state.get("eerste_periode_start", None)
-    if eerste_start is not None:
-        st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
-    else:
-        st.info("Er is nog geen eerste periode ingesteld. Stel deze in om periodes te kunnen bekijken.")
+eerste_start = st.session_state.get("eerste_periode_start", None)
+if eerste_start is not None:
+    st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
+else:
+    st.info("Er is nog geen eerste periode ingesteld. Stel deze in om periodes te kunnen bekijken.")
 
-   
-    if st.session_state["eerste_periode_start"] is None:
-        eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
-        if st.button("Zet eerste periode"):
-            save_eerste_periode(eerste_start)
-            st.success("Eerste periode ingesteld!")
-            st.rerun()
-        st.stop()
-    else:
-        eerste_start = st.session_state["eerste_periode_start"]
-        if st.button("Wijzig eerste periode"):
-            nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
-            if st.button("Opslaan nieuwe eerste periode"):
-                st.session_state["eerste_periode_start"] = nieuwe_start
-                save_eerste_periode(nieuwe_start)
-                st.success("Eerste periode aangepast!")
-            st.stop()
-
-        # Bepaal het aantal periodes tot nu toe
-        dagen_geleden = (date.today() - eerste_start).days
-        huidige_periode = 1 + dagen_geleden // 28
-        totaal_periodes = max(1, huidige_periode)
-        
-        # Maak periode-opties met datums
-        periode_opties = []
-        for p in range(1, totaal_periodes+1):
-            p_start = eerste_start + timedelta(days=(p-1)*28)
-            p_eind = p_start + timedelta(days=27)
-            periode_opties.append(f"Periode {p} ({p_start.strftime('%d-%m-%Y')} t/m {p_eind.strftime('%d-%m-%Y')})")
-        periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
-        periode_start = eerste_start + timedelta(days=(periode_idx)*28)
-        periode_eind = periode_start + timedelta(days=27)
-        
-        # Filter df_periode op deze periode:
-        mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
-        df_periode = df.loc[mask].copy()
-    if df_periode.empty:
-        st.info("Geen uren gevonden voor deze periode.")
+if st.session_state["eerste_periode_start"] is None:
+    eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
+    if st.button("Zet eerste periode"):
+        save_eerste_periode(eerste_start)
+        st.success("Eerste periode ingesteld!")
+        st.rerun()
+    st.stop()
+else:
+    eerste_start = st.session_state["eerste_periode_start"]
+    if st.button("Wijzig eerste periode"):
+        nieuwe_start = st.date_input("Nieuwe begindatum eerste periode", value=eerste_start, key="nieuwe_periode_start")
+        if st.button("Opslaan nieuwe eerste periode"):
+            st.session_state["eerste_periode_start"] = nieuwe_start
+            save_eerste_periode(nieuwe_start)
+            st.success("Eerste periode aangepast!")
         st.stop()
 
-    df_periode["Uurtarief"] = df_periode["Bedrijf"].apply(get_uurtarief)
-    df_periode["Bedrag"] = df_periode["Uren"] * df_periode["Uurtarief"]
-    df_periode["Loonheffingspercentage"] = df_periode["Bedrijf"].apply(get_loonheffingspercentage)
-    df_periode["NettoBedrag"] = df_periode.apply(lambda row: row["Bedrag"] * (1 - row["Loonheffingspercentage"]), axis=1)
+    # Bepaal het aantal periodes tot nu toe
+    dagen_geleden = (date.today() - eerste_start).days
+    huidige_periode = 1 + dagen_geleden // 28
+    totaal_periodes = max(1, huidige_periode)
+    # Maak periode-opties met datums
+    periode_opties = []
+    for p in range(1, totaal_periodes + 1):
+        p_start = eerste_start + timedelta(days=(p - 1) * 28)
+        p_eind = p_start + timedelta(days=27)
+        periode_opties.append(f"Periode {p} ({p_start.strftime('%d-%m-%Y')} t/m {p_eind.strftime('%d-%m-%Y')})")
+    periode_idx = st.selectbox("Kies periode", list(range(totaal_periodes)), format_func=lambda i: periode_opties[i])
+    periode_start = eerste_start + timedelta(days=(periode_idx) * 28)
+    periode_eind = periode_start + timedelta(days=27)
+    # Filter df_periode op deze periode:
+    mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
+    df_periode = df.loc[mask].copy()
 
-    totaal_uren = df_periode['Uren'].sum()
-    totaal_bedrag = df_periode['Bedrag'].sum()
-    totaal_nettobedrag = df_periode['NettoBedrag'].sum()
+# Controleer of df_periode bestaat en niet leeg is
+if 'df_periode' not in locals() or df_periode.empty:
+    st.info("Geen uren gevonden voor deze periode.")
+    st.stop()
 
-    st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
-    st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
-    st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
+# Weekoverzicht met datums achter weeknummer
+st.subheader("Weekoverzicht")
 
+def week_datum_range(weeknr):
+    week_df = df_periode[df_periode['Week'] == weeknr]
+    if week_df.empty:
+        return ""
+    start = week_df['Datum_obj'].min()
+    eind = week_df['Datum_obj'].max()
+    if pd.isnull(start) or pd.isnull(eind):
+        return ""
+    return f"{start.strftime('%d-%m-%Y')} t/m {eind.strftime('%d-%m-%Y')}"
 
-    st.subheader("Weekoverzicht")
+weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
+weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
+st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
 
     def week_datum_range(weeknr):
         week_df = df_periode[df_periode['Week'] == weeknr]
