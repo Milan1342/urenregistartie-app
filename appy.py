@@ -212,7 +212,7 @@ if st.sidebar.button("Account verwijderen"):
 # ------------------ Bedrijven beheren ------------------
 elif pagina == "Bedrijven beheren":
     st.title("Bedrijven beheren")
-    st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
+    st.markdown("Bekijk, bewerk of verwijder bestaande bedrijven en voeg nieuwe bedrijven toe.")
 
      # --- Bestaande bedrijven tonen, bewerken en verwijderen ---
     if st.session_state["bedrijven"]:
@@ -298,6 +298,9 @@ elif pagina == "Bedrijven beheren":
         st.info("Nog geen bedrijven toegevoegd.")
 
     # --- Toevoegen bedrijf ---
+        st.title("Bedrijven Aanmaken")
+    st.markdown("Voeg bedrijven toe met uurtarief, begindatum, actief-status en loonstrookgegevens.")
+
     with st.form("bedrijf_form", clear_on_submit=True):
         naam = st.text_input("Bedrijfsnaam")
         uurtarief = st.number_input("Uurtarief (€)", min_value=0.0, value=12.0, step=0.5)
