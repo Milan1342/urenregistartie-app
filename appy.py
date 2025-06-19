@@ -488,13 +488,13 @@ elif pagina == "Overzicht":
         mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
         df_periode = df.loc[mask].copy()
 
-    # Controleer of df_periode bestaat en niet leeg is
-    if df_periode.empty:
-        st.info("Geen uren gevonden voor deze periode.")
-        st.stop()
+# Controleer of df_periode bestaat en niet leeg is
+if df_periode.empty:
+    st.info("Geen uren gevonden voor deze periode.")
+    st.stop()
 
-    # Weekoverzicht met datums achter weeknummer
-    st.subheader("Weekoverzicht")
+# Weekoverzicht met datums achter weeknummer
+st.subheader("Weekoverzicht")
 
 def week_datum_range(weeknr):
     week_df = df_periode[df_periode['Week'] == weeknr]
