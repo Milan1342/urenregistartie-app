@@ -122,6 +122,27 @@ if "data_loaded" not in st.session_state:
 
 st.set_page_config(page_title="Urenregistratie", layout="wide")
 
+# --- Hulpfuncties voor uurtarief en loonheffing ---
+def get_uurtarief(bedrijfsnaam):
+    bedrijven = st.session_state.get("bedrijven", [])
+    for b in bedrijven:
+        if b["naam"] == bedrijfsnaam:
+            return b.get("uurtarief", 0.0)
+    return 0.0
+
+def get_loonheffingspercentage(bedrijfsnaam):
+    bedrijven = st.session_state.get("bedrijven", [])
+    for b in bedrijven:
+        if b["naam"] == bedrijfsnaam:
+            return b.get("loonheffingspercentage", 0.10)
+    return 0.10
+
+def to_excel(df: pd.DataFrame) -> bytes:
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
+
 # --- Navigatie met jaaropgave als extra pagina ---
 sidebar_opties = ["Uren invoeren", "Overzicht", "Bedrijven beheren", "Persoonsgegevens"]
 
@@ -155,12 +176,6 @@ if "uren_data" not in st.session_state:
     st.session_state["uren_data"] = []
 if "bedrijven" not in st.session_state:
     st.session_state["bedrijven"] = []
-
-def to_excel(df: pd.DataFrame) -> bytes:
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False)
-    return output.getvalue()
 
 # ------------------ Persoonsgegevens ------------------
 if pagina == "Persoonsgegevens":
@@ -370,12 +385,6 @@ elif pagina == "Overzicht":
     data = st.session_state.get("uren_data", [])
     bedrijven = st.session_state.get("bedrijven", [])
 
-    def get_loonheffingspercentage(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b.get("loonheffingspercentage", 0.10)
-        return 0.10
-
     if not bedrijven:
         st.warning("Er zijn nog geen bedrijven toegevoegd. Voeg eerst bedrijven toe onder 'Bedrijven beheren'.")
         st.stop()
@@ -410,14 +419,7 @@ elif pagina == "Overzicht":
     if gekozen_bedrijf != "Allemaal":
         df = df[df["Bedrijf"] == gekozen_bedrijf]
 
-
     # --- Jaarinkomsten ---
-    def get_uurtarief(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b["uurtarief"]
-        return 0.0
-
     df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
     df["Bedrag"] = df["Uren"] * df["Uurtarief"]
     df["Loonheffingspercentage"] = df["Bedrijf"].apply(get_loonheffingspercentage)
@@ -427,54 +429,14 @@ elif pagina == "Overzicht":
     jaar_netto = df["NettoBedrag"].sum()
     jaar_uren = df["Uren"].sum()
 
+    st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
+    st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
+    st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
 
-    # Toevoegen: Uren aanpassen/verwijderen
-    st.subheader("Uren aanpassen of verwijderen")
-    for i, row in df.iterrows():
-        cols = st.columns([2,2,2,2,2,2,2,1,1])
-        for j, col in enumerate(benodigde_kolommen):
-            cols[j].write(str(row[col]))
-        if cols[-2].button("✏️", key=f"edit_{i}"):
-            st.session_state["edit_row"] = i
-        if cols[-1].button("🗑️", key=f"del_{i}"):
-            st.session_state["uren_data"].pop(i)
-            save_uren()
-            st.rerun()
-
-    # Bewerken van een regel
-    if "edit_row" in st.session_state:
-        idx = st.session_state["edit_row"]
-        if idx >= len(st.session_state["uren_data"]):
-            del st.session_state["edit_row"]
-            st.rerun()
-        edit_row = st.session_state["uren_data"][idx]
-        st.info("Pas de gegevens aan en klik op 'Opslaan'")
-        with st.form("edit_form"):
-            bedrijf = st.text_input("Bedrijf", value=edit_row["Bedrijf"])
-            dag = st.text_input("Dag", value=edit_row["Dag"])
-            datum = st.date_input("Datum", value=pd.to_datetime(edit_row["Datum"]).date())
-            starttijd = st.text_input("Starttijd", value=edit_row["Starttijd"])
-            eindtijd = st.text_input("Eindtijd", value=edit_row["Eindtijd"])
-            pauze = st.number_input("Pauze (min)", value=int(edit_row["Pauze (min)"]))
-            uren = st.number_input("Uren", value=float(edit_row["Uren"]))
-            opslaan = st.form_submit_button("Opslaan")
-            annuleren = st.form_submit_button("Annuleren")
-        if opslaan:
-            st.session_state["uren_data"][idx] = {
-                "Bedrijf": bedrijf,
-                "Dag": dag,
-                "Datum": datum.strftime("%Y-%m-%d"),
-                "Starttijd": starttijd,
-                "Eindtijd": eindtijd,
-                "Pauze (min)": pauze,
-                "Uren": uren
-            }
-            save_uren()
-            del st.session_state["edit_row"]
-            st.rerun()
-        if annuleren:
-            del st.session_state["edit_row"]
-            st.rerun()
+    # --- Knop naar uren aanpassen pagina ---
+    if st.button("Bekijk en bewerk alle uren"):
+        st.session_state["pagina"] = "Uren aanpassen"
+        st.rerun()
 
     # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
     st.subheader("Periode selectie (4 weken per periode)")
@@ -564,10 +526,79 @@ elif pagina == "Overzicht":
     else:
         st.info("Geen weekoverzicht beschikbaar.")
 
+    # Download knop
+    excel_bytes = to_excel(df_periode.drop(columns=['Datum_obj']))
+    st.download_button(
+        label="Download als Excel",
+        data=excel_bytes,
+        file_name="urenregistratie.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # --- Jaaropgave knop ---
     if st.button("Bekijk jaaropgave"):
         st.session_state["pagina"] = "Jaaropgave"
+        st.rerun()
+
+# ------------------ Uren aanpassen ------------------
+elif pagina == "Uren aanpassen":
+    st.title("Uren aanpassen en verwijderen")
+    data = st.session_state.get("uren_data", [])
+    if not data:
+        st.info("Er zijn nog geen uren ingevoerd.")
+    else:
+        df = pd.DataFrame(data)
+        st.dataframe(df)
+        st.write("Klik op het potloodje om een regel te bewerken of op de prullenbak om te verwijderen.")
+        benodigde_kolommen = ["Bedrijf", "Dag", "Datum", "Starttijd", "Eindtijd", "Pauze (min)", "Uren"]
+        for i, row in df.iterrows():
+            cols = st.columns([2,2,2,2,2,2,2,1,1])
+            for j, col in enumerate(benodigde_kolommen):
+                cols[j].write(str(row[col]))
+            if cols[-2].button("✏️", key=f"edit_{i}_aanpassen"):
+                st.session_state["edit_row"] = i
+            if cols[-1].button("🗑️", key=f"del_{i}_aanpassen"):
+                st.session_state["uren_data"].pop(i)
+                save_uren()
+                st.rerun()
+
+        # Bewerken van een regel
+        if "edit_row" in st.session_state:
+            idx = st.session_state["edit_row"]
+            if idx >= len(st.session_state["uren_data"]):
+                del st.session_state["edit_row"]
+                st.rerun()
+            edit_row = st.session_state["uren_data"][idx]
+            st.info("Pas de gegevens aan en klik op 'Opslaan'")
+            with st.form("edit_form_aanpassen"):
+                bedrijf = st.text_input("Bedrijf", value=edit_row["Bedrijf"])
+                dag = st.text_input("Dag", value=edit_row["Dag"])
+                datum = st.date_input("Datum", value=pd.to_datetime(edit_row["Datum"]).date())
+                starttijd = st.text_input("Starttijd", value=edit_row["Starttijd"])
+                eindtijd = st.text_input("Eindtijd", value=edit_row["Eindtijd"])
+                pauze = st.number_input("Pauze (min)", value=int(edit_row["Pauze (min)"]))
+                uren = st.number_input("Uren", value=float(edit_row["Uren"]))
+                opslaan = st.form_submit_button("Opslaan")
+                annuleren = st.form_submit_button("Annuleren")
+            if opslaan:
+                st.session_state["uren_data"][idx] = {
+                    "Bedrijf": bedrijf,
+                    "Dag": dag,
+                    "Datum": datum.strftime("%Y-%m-%d"),
+                    "Starttijd": starttijd,
+                    "Eindtijd": eindtijd,
+                    "Pauze (min)": pauze,
+                    "Uren": uren
+                }
+                save_uren()
+                del st.session_state["edit_row"]
+                st.rerun()
+            if annuleren:
+                del st.session_state["edit_row"]
+                st.rerun()
+
+    if st.button("Terug naar overzicht"):
+        st.session_state["pagina"] = "Overzicht"
         st.rerun()
 
 # ------------------ Jaaropgave ------------------
@@ -591,18 +622,6 @@ elif pagina == "Jaaropgave":
     df = df[df['Jaar'] == gekozen_jaar]
     if gekozen_bedrijf != "Allemaal":
         df = df[df["Bedrijf"] == gekozen_bedrijf]
-
-    # Uurtarief en loonheffing ophalen
-    def get_loonheffingspercentage(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b.get("loonheffingspercentage", 0.10)
-        return 0.10
-    def get_uurtarief(bedrijfsnaam):
-        for b in bedrijven:
-            if b["naam"] == bedrijfsnaam:
-                return b["uurtarief"]
-        return 0.0
 
     df["Uurtarief"] = df["Bedrijf"].apply(get_uurtarief)
     df["Bedrag"] = df["Uren"] * df["Uurtarief"]
