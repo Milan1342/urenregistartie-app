@@ -502,7 +502,7 @@ elif pagina == "Overzicht":
     st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
     st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
 
-    # Weekoverzicht met datums achter weeknummer
+
     st.subheader("Weekoverzicht")
 
     def week_datum_range(weeknr):
