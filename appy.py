@@ -442,6 +442,13 @@ elif pagina == "Overzicht":
 
     # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
     st.subheader("Periode selectie (4 weken per periode)")
+    
+    eerste_start = st.session_state.get("eerste_periode_start", None)
+    if eerste_start is not None:
+        st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
+    else: st.info("Er is nog geen eerste periode ingesteld. Stel deze in om periodes te kunnen bekijken.")
+   
+   
     if st.session_state["eerste_periode_start"] is None:
         eerste_start = st.date_input("Kies de begindatum van de allereerste periode")
         if st.button("Zet eerste periode"):
@@ -458,6 +465,7 @@ elif pagina == "Overzicht":
                 save_eerste_periode(nieuwe_start)
                 st.success("Eerste periode aangepast!")
             st.stop()
+
         # Bepaal het aantal periodes tot nu toe
         dagen_geleden = (date.today() - eerste_start).days
         huidige_periode = 1 + dagen_geleden // 28
@@ -474,7 +482,6 @@ elif pagina == "Overzicht":
         # Filter df_periode op deze periode:
         mask = (df['Datum_obj'] >= pd.to_datetime(periode_start)) & (df['Datum_obj'] <= pd.to_datetime(periode_eind))
         df_periode = df.loc[mask].copy()
-
     if df_periode.empty:
         st.info("Geen uren gevonden voor deze periode.")
         st.stop()
