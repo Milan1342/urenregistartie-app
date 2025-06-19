@@ -231,8 +231,8 @@ elif pagina == "Bedrijven beheren":
         if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
             bruto_per_dag = bruto + reiskosten
             netto_per_dag = netto 
-            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag) * 100
-            st.info(f"Automatisch berekend percentage: "+ loonheffingspercentage + " %")
+            loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
+            st.info(f"Automatisch berekend percentage: "+ loonheffingspercentage * 100+ " %")
 
         if toevoegen:
             foutmelding = ""
@@ -243,7 +243,8 @@ elif pagina == "Bedrijven beheren":
             else:
                 bruto_per_dag = bruto + reiskosten
                 netto_per_dag = netto
-                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag) * 100                st.session_state["bedrijven"].append({
+                loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)                
+                st.session_state["bedrijven"].append({
                     "naam": naam,
                     "uurtarief": uurtarief,
                     "startdatum": startdatum,
