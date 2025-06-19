@@ -485,55 +485,55 @@ elif pagina == "Overzicht":
         df_periode = df.loc[mask].copy()
 
 
-# Weekoverzicht met datums achter weeknummer
-st.subheader("Weekoverzicht")
+        # Weekoverzicht met datums achter weeknummer
+        st.subheader("Weekoverzicht")
 
-weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
+        weekoverzicht = df_periode.groupby("Week")[["Uren", "Bedrag", "NettoBedrag"]].sum().reset_index()
 
-# Plak hier de functie:
-def week_datum_range(weeknr):
-    week_df = df_periode[df_periode['Week'] == weeknr]
-    if week_df.empty:
-        return ""
-    start = week_df['Datum_obj'].min()
-    end = week_df['Datum_obj'].max()
-    if not isinstance(start, pd.Timestamp) or not isinstance(end, pd.Timestamp):
-        return ""
-    if pd.isna(start) or pd.isna(end):
-        return ""
-    return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
+        # Plak hier de functie:
+        def week_datum_range(weeknr):
+            week_df = df_periode[df_periode['Week'] == weeknr]
+            if week_df.empty:
+                return ""
+            start = week_df['Datum_obj'].min()
+            end = week_df['Datum_obj'].max()
+            if not isinstance(start, pd.Timestamp) or not isinstance(end, pd.Timestamp):
+                return ""
+            if pd.isna(start) or pd.isna(end):
+                return ""
+            return f"{start.strftime('%d-%m-%Y')} t/m {end.strftime('%d-%m-%Y')}"
 
-weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+        weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
 
 
-weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
-weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
+        weekoverzicht["Datums"] = weekoverzicht["Week"].apply(week_datum_range)
+        weekoverzicht["Weeknummer"] = weekoverzicht.apply(lambda r: f"Week {r['Week']} ({r['Datums']})", axis=1)
 
-weekoverzicht["NettoBedrag"] = weekoverzicht["NettoBedrag"].round(2)
-weekoverzicht["Bedrag"] = weekoverzicht["Bedrag"].round(2)
+        weekoverzicht["NettoBedrag"] = weekoverzicht["NettoBedrag"].round(2)
+        weekoverzicht["Bedrag"] = weekoverzicht["Bedrag"].round(2)
 
-st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
+        st.dataframe(weekoverzicht[["Weeknummer", "Uren", "Bedrag", "NettoBedrag"]])
 
-# Selecteer week en kopieer uren
-st.subheader("Kopieer je weekoverzicht")
-weeknummers = weekoverzicht['Week'].tolist()
-weeklabels = weekoverzicht['Weeknummer'].tolist()
-if weeknummers:
-    gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
-    gekozen_week = weeknummers[gekozen_idx]
-    week_df = df_periode[df_periode['Week'] == gekozen_week]
+        # Selecteer week en kopieer uren
+        st.subheader("Kopieer je weekoverzicht")
+        weeknummers = weekoverzicht['Week'].tolist()
+        weeklabels = weekoverzicht['Weeknummer'].tolist()
+        if weeknummers:
+            gekozen_idx = st.selectbox("Kies weeknummer", list(range(len(weeknummers))), format_func=lambda i: weeklabels[i])
+            gekozen_week = weeknummers[gekozen_idx]
+            week_df = df_periode[df_periode['Week'] == gekozen_week]
 
-    if not week_df.empty:
-        kopieer_tekst = "\n".join(
-            f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
-            for _, row in week_df.iterrows()
-        )
-        key_kopieer = f"kopieer_tekst_{gekozen_week}"
-        st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key=key_kopieer)
-    else:
-        st.info("Geen uren gevonden voor deze week.")
-else:
-    st.info("Geen weekoverzicht beschikbaar.")
+            if not week_df.empty:
+                kopieer_tekst = "\n".join(
+                    f"{row['Dag']}- {row['Datum']} {row['Starttijd']}/{row['Eindtijd']}({row['Pauze (min)']}) {row['Uren']:.2f} uur"
+                    for _, row in week_df.iterrows()
+                )
+                key_kopieer = f"kopieer_tekst_{gekozen_week}"
+                st.text_area("Kopieer deze tekst en stuur door:", kopieer_tekst, height=200, key=key_kopieer)
+            else:
+                st.info("Geen uren gevonden voor deze week.")
+        else:
+            st.info("Geen weekoverzicht beschikbaar.")
 
 # ------------------ Uren aanpassen ------------------
 if pagina == "Uren aanpassen":
