@@ -442,7 +442,7 @@ elif pagina == "Overzicht":
 
     # Periodebeheer: 4-weken periodes met opslag en datums in selectbox
     st.subheader("Periode selectie (4 weken per periode)")
-    
+
     eerste_start = st.session_state.get("eerste_periode_start", None)
     if eerste_start is not None:
         st.info(f"Eerste periode start op: {eerste_start.strftime('%d-%m-%Y')}")
@@ -494,10 +494,6 @@ elif pagina == "Overzicht":
     totaal_uren = df_periode['Uren'].sum()
     totaal_bedrag = df_periode['Bedrag'].sum()
     totaal_nettobedrag = df_periode['NettoBedrag'].sum()
-
-    st.metric("Totaal gewerkte uren", f"{totaal_uren:.2f} uur")
-    st.metric("Totaal bruto bedrag", f"€{totaal_bedrag:.2f}")
-    st.metric("Totaal netto bedrag (geschat)", f"€{totaal_nettobedrag:.2f}")
 
     # Weekoverzicht met datums achter weeknummer
     st.subheader("Weekoverzicht")
