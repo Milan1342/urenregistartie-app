@@ -254,8 +254,8 @@ elif pagina == "Bedrijven beheren":
 
                 # Toon percentage als alles is ingevuld
                 if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
-                    bruto_per_dag = (bruto + reiskosten) / dagen
-                    netto_per_dag = netto / dagen
+                    bruto_per_dag = bruto + reiskosten
+                    netto_per_dag = netto
                     loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
                     st.info(f"Automatisch berekend percentage: {loonheffingspercentage*100:.2f}%")
                 else:
@@ -271,8 +271,8 @@ elif pagina == "Bedrijven beheren":
                 elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
                     foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
                 else:
-                    bruto_per_dag = (bruto + reiskosten) / dagen
-                    netto_per_dag = netto / dagen
+                    bruto_per_dag = bruto + reiskosten
+                    netto_per_dag = netto 
                     loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
                     st.session_state["bedrijven"][idx] = {
                         "naam": naam,
@@ -315,8 +315,8 @@ elif pagina == "Bedrijven beheren":
 
         # Toon alvast het percentage als alles is ingevuld
         if bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten:
-            bruto_per_dag = (bruto + reiskosten) / dagen
-            netto_per_dag = netto / dagen
+            bruto_per_dag = bruto + reiskosten 
+            netto_per_dag = netto 
             loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
             st.info(f"Automatisch berekend percentage: {loonheffingspercentage * 100:.2f} %")
 
@@ -327,8 +327,8 @@ elif pagina == "Bedrijven beheren":
             elif not (bruto > 0 and netto > 0 and dagen > 0 and netto <= bruto + reiskosten):
                 foutmelding = "Vul alle loonstrookvelden correct in (bruto, netto, reiskosten, dagen)."
             else:
-                bruto_per_dag = (bruto + reiskosten) / dagen
-                netto_per_dag = netto / dagen
+                bruto_per_dag = bruto + reiskosten
+                netto_per_dag = netto 
                 loonheffingspercentage = 1 - (netto_per_dag / bruto_per_dag)
                 st.session_state["bedrijven"].append({
                     "naam": naam,
