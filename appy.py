@@ -430,10 +430,6 @@ elif pagina == "Overzicht":
     jaar_netto = df["NettoBedrag"].sum()
     jaar_uren = df["Uren"].sum()
 
-    st.metric("Jaarinkomsten bruto", f"€{jaar_bruto:.2f}")
-    st.metric("Jaarinkomsten netto (geschat)", f"€{jaar_netto:.2f}")
-    st.metric("Jaaruren", f"{jaar_uren:.2f} uur")
-
     # --- Jaaropgave knop ---
     if st.button("Bekijk jaaropgave"):
         st.session_state["pagina"] = "Jaaropgave"
